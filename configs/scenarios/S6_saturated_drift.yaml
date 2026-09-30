@@ -1,0 +1,85 @@
+# ===========================================================================
+# S6 -- Saturated corridor with edge drift   (the diagnostic-driven scenario)
+# ===========================================================================
+# WHY THIS SCENARIO EXISTS
+# ------------------------
+# The oracle diagnostic on S1 returned Case A: perfect, continuously
+# refreshed ground-truth slopes bought +0.0046 wIF over a FROZEN table.
+# Tuning an estimator against that would have been manufacturing a gain.
+#
+# The cause was measured directly rather than guessed.  PRB allocation is
+# min(share * quota, demand), so while the cell has spare capacity an
+# unused quota costs nobody anything.  Raising T1's quota by 8 PRB at the
+# S1 operating point (68% utilisation) produced:
+#
+#     dT1 +0.435   dT2 +0.653   dT3 +0.079   NET +1.167 Mb/s/UE
+#
+# Every tenant gained.  It is a free lunch, and it even helped T2 more than
+# the tenant whose quota was raised.  In that regime the dominant policy is
+# "raise everything", which is why wIF tracked WRITE RATE far more closely
+# than slope quality, why the real B3 (no safety bound, 4x the write rate)
+# beat every principled controller, and why two sessions of estimator
+# tuning could not move the result.  This is the same failure mode already
+# recorded in this project's notes: the PRB quota cannot be the contested
+# resource unless the pool actually binds.
+#
+# THE FIX IS PHYSICAL, NOT COSMETIC
+# ---------------------------------
+# Offered load is raised until the PRB pool binds.  At +100% the same
+# +8 PRB experiment gives:
+#
+#     dT1 -0.296   dT2 +0.369   dT3 -0.063   NET +0.011 Mb/s/UE
+#
+# Net zero.  Allocation is now strictly zero-sum: every PRB granted to one
+# tenant is taken from another, so "write more" stops being free and WHICH
+# write is chosen becomes the whole decision.  That is the precondition for
+# sensitivity knowledge to have any value at all.
+#
+# The drift mechanism from S1 is retained unchanged: T1 migrates outward
+# across the antenna beam peak at h_bs/tan(8 deg) = 178 m, so the tilt
+# sensitivity reverses sign while the load label that indexes the frozen
+# table does not move.  Now that the resource is contested, acting on the
+# reversed sign should finally be worth something.
+#
+# ACCEPTANCE GATES, DECLARED BEFORE EVALUATION
+# --------------------------------------------
+#   oracle - frozen INTACT-RA      >= 0.030   (dynamic slopes are valuable)
+#   true slopes - scrambled slopes >= 0.050   AT MATCHED WRITE RATE
+#                                             (it is slope KNOWLEDGE, not
+#                                              actuation volume)
+#   all-reject and all-accept both clearly inferior
+# If the first two fail, this scenario is rejected like S1 was.
+
+_scenario_note: >
+  Saturated cell with constant-load outward migration of T1 across the
+  antenna beam peak. The PRB pool binds, so allocation is zero-sum and
+  the choice of write matters rather than the number of writes.
+
+run:
+  epochs: 800
+
+ran:
+  # Load raised until the pool binds. Verified: the marginal +8 PRB
+  # experiment nets +0.011 Mb/s/UE here, against +1.167 at the S1 load.
+  slices:
+    T1: {load_mbps_per_ue: 3.05}
+    T2: {load_mbps_per_ue: 3.05}
+    T3: {load_mbps_per_ue: 1.02}
+  initial_controls:
+    tilt: 8.0
+  mobility:
+    mode: group_drift
+    drift:
+      tenants: [T1]
+      rate_m_per_slot: 0.0140
+      start_slot: 400
+      jitter_m_per_slot: 0.10
+    wander_radius_m: 35.0
+
+gates:
+  control_gain_min: 0.030
+  conflict_gain_min: 0.030
+  drift_materiality_min: 2.0
+  agentic_gain_min: 0.010
+  oracle_gain_min: 0.030          # oracle - frozen INTACT-RA
+  knowledge_gain_min: 0.050       # true - scrambled, at matched write rate

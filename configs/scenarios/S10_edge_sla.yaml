@@ -1,0 +1,130 @@
+# ===========================================================================
+# S10 -- Edge migration with contractual SLAs  (THE HEADLINE SCENARIO)
+# ===========================================================================
+# Derived from three measured failures, each of which fixed one design
+# requirement.  The requirements are the SCOPE of the headline claim.
+#
+# (R1) The migrating tenant must become CAPACITY-LIMITED at the edge.
+#      S9 constant-tilt sweep: the best tilt was 8 deg both before and after
+#      migration, because T1 was DEMAND-limited -- its throughput equalled
+#      its offered load, so coverage never mattered to it (i1 fulfilment
+#      0.58 -> 0.51 across the whole 4-12 deg range).  Adaptation then has
+#      no attainable value.  Here T1 carries 3.0 Mb/s/UE at constant load:
+#      comfortably served near-in, capacity-limited at ~300 m.
+#
+# (R2) SLAs are CONTRACTS fixed at provisioning time.
+#      S7-S9 set every target at the median of the passive plant over the
+#      whole run, so all-reject scored ~50% per intent BY CONSTRUCTION and
+#      every controller had to beat the plant's own distribution.  Targets
+#      here come from the PRE-migration window only
+#      (calibrate_targets.py --to-epoch 95), so a network left alone breaks
+#      T1's contract after the migration, as a real one would.
+#
+# (R3) No controller may be driven into a boundary by xApp pressure.
+#      S7 and S9: setpoints outside the plant's operating range made xApps
+#      permanently unsatisfied, and every step-wise arbiter -- including a
+#      rollout planner -- ratcheted the knob to its limit.  Both tilt
+#      controllers here are closed loops on their OWN tenant's KPI.
+#
+# T1 migrates at CONSTANT offered load from ~110 m, well inside the beam
+# peak at h/tan 8deg = 178 m, to ~300 m beyond it.  Its load label never
+# moves; its coverage and its tilt sensitivity do.  T2/T3 carry the
+# out-of-phase quota contest that separates INTACT-RA from B3.
+
+_scenario_note: >
+  Constant-load migration of a capacity-hungry tenant from well inside to
+  well beyond the antenna beam peak, with contractual SLAs fixed before the
+  migration and closed-loop tilt controllers on both sides of the conflict.
+
+run:
+  epochs: 500
+
+_replace_sections: [intents, xapps, claims]
+
+claims:
+  - {jid: j1, xapp: energy,    tenant: HOST, param: txpower, scope: cell,
+     kind: regulative, domain: [32.0, 46.0], step: 0.5, max_step_frac: 0.20, r_j: 0.40}
+  - {jid: j2, xapp: coverage,  tenant: HOST, param: txpower, scope: cell,
+     kind: regulative, domain: [32.0, 46.0], step: 0.5, max_step_frac: 0.20, r_j: 0.55}
+  - {jid: j3, xapp: tilt_edge, tenant: HOST, param: tilt, scope: cell,
+     kind: regulative, domain: [2.0, 12.0], step: 0.5, max_step_frac: 0.25, r_j: 0.50}
+  - {jid: j10, xapp: tilt_core, tenant: HOST, param: tilt, scope: cell,
+     kind: regulative, domain: [2.0, 12.0], step: 0.5, max_step_frac: 0.25, r_j: 0.50}
+  - {jid: j4, xapp: tput_T1,   tenant: T1, param: quota_T1, scope: slice,
+     kind: allocative, domain: [10.0, 58.0], step: 1.0, max_step_frac: 0.15,
+     resource: prb, d_bar: 58.0, r_j: 0.70}
+  - {jid: j5, xapp: lat_T2,    tenant: T2, param: quota_T2, scope: slice,
+     kind: allocative, domain: [10.0, 54.0], step: 1.0, max_step_frac: 0.15,
+     resource: prb, d_bar: 54.0, r_j: 0.65}
+  - {jid: j6, xapp: rob_T3,    tenant: T3, param: quota_T3, scope: slice,
+     kind: allocative, domain: [6.0, 40.0], step: 1.0, max_step_frac: 0.15,
+     resource: prb, d_bar: 40.0, r_j: 0.45}
+
+xapps:
+  - {name: energy,    kind: energy,     tenant: HOST, param: txpower,
+     domain: [32.0, 46.0], step: 0.5, gain: 0.45, target: 36.5}
+  - {name: coverage,  kind: coverage,   tenant: HOST, param: txpower,
+     domain: [32.0, 46.0], step: 0.5, gain: 0.55, edge_trigger: 0.5, sinr_target: 17.0}
+  # closed loops, each on its own tenant: T1 throughput wants uptilt when
+  # short, T2 delay wants downtilt when late.  Both release when satisfied.
+  - {name: tilt_edge, kind: throughput, tenant: T1, param: tilt,
+     domain: [2.0, 12.0], step: 0.5, gain: -2.0, target: 1.5, deadband: 0.10}
+  - {name: tilt_core, kind: latency,    tenant: T2, param: tilt,
+     domain: [2.0, 12.0], step: 0.5, gain: 0.05, target: 5.0, deadband: 0.5}
+  - {name: tput_T1,   kind: throughput, tenant: T1, param: quota_T1,
+     domain: [10.0, 58.0], step: 1.0, gain: 2.4, target: 1.5, deadband: 0.10}
+  - {name: lat_T2,    kind: latency,    tenant: T2, param: quota_T2,
+     domain: [10.0, 54.0], step: 1.0, gain: 0.5, target: 5.0, deadband: 0.5}
+  - {name: rob_T3,    kind: throughput, tenant: T3, param: quota_T3,
+     domain: [6.0, 40.0], step: 1.0, gain: 3.0, target: 0.7, deadband: 0.05}
+
+ran:
+  allocation: dedicated
+  initial_controls:
+    tilt: 8.0
+    quota_T1: 46.0
+    quota_T2: 42.0
+    quota_T3: 30.0
+  slices:
+    T1:
+      load_mbps_per_ue: 3.0
+      placement: {radius_min_m: 80.0, radius_max_m: 140.0}
+      load_profile: {levels: [1.0], hold_slots: 1000000, phase: 0}
+    T2:
+      load_profile: {levels: [1.60, 0.60], hold_slots: 700, ramp_slots: 100, phase: 0}
+    T3:
+      load_profile: {levels: [0.60, 1.60], hold_slots: 700, ramp_slots: 100, phase: 0}
+  mobility:
+    mode: group_drift
+    drift:
+      tenants: [T1]
+      rate_m_per_slot: 0.030      # 110 m -> ~300 m over epochs 100-500
+      start_slot: 1600            # epochs 0-99 stationary: the SLA window
+      jitter_m_per_slot: 0.10
+    wander_radius_m: 35.0
+
+gates:
+  oracle_gain_min: 0.030
+  knowledge_gain_min: 0.050
+  control_gain_min: 0.030
+  conflict_gain_min: 0.030
+  agentic_gain_min: 0.010
+
+# >>> CALIBRATED -- written by scripts/calibrate_targets.py; do not edit by hand
+intents:
+  - {iid: i1, tenant: T1, kpi: throughput_mbps, target: 2.580, direction: higher_better, pi_class: 1.0, weight: 1.0, epsilon: 0.02}
+  - {iid: i2, tenant: T1, kpi: delay_p90_ms, target: 4.00, direction: lower_better, pi_class: 1.0, weight: 1.0, epsilon: 0.02}   # delay_p90_ms: delay_p50 IQR degenerate here
+  - {iid: i3, tenant: T2, kpi: throughput_mbps, target: 1.077, direction: higher_better, pi_class: 1.0, weight: 1.0, epsilon: 0.02}
+  - {iid: i4, tenant: T2, kpi: delay_p90_ms, target: 4.86, direction: lower_better, pi_class: 1.0, weight: 1.0, epsilon: 0.02}   # delay_p90_ms: delay_p50 IQR degenerate here
+  - {iid: i5, tenant: T3, kpi: throughput_mbps, target: 0.429, direction: higher_better, pi_class: 1.0, weight: 1.0, epsilon: 0.02}
+  - {iid: i6, tenant: T3, kpi: delay_p90_ms, target: 803.32, direction: lower_better, pi_class: 1.0, weight: 1.0, epsilon: 0.02}   # delay_p90_ms: delay_p50 IQR degenerate here
+  - {iid: i7, tenant: HOST, kpi: txpower_dbm, target: 40.0, direction: lower_better, pi_class: 1.0, weight: 1.0, epsilon: 0.0}
+xapps:
+  - {name: energy, kind: energy, tenant: HOST, param: txpower, domain: [32.0, 46.0], step: 0.5, gain: 0.45, target: 36.5}
+  - {name: coverage, kind: coverage, tenant: HOST, param: txpower, domain: [32.0, 46.0], step: 0.5, gain: 0.55, edge_trigger: 0.274, sinr_target: 22.39}
+  - {name: tilt_edge, kind: throughput, tenant: T1, param: tilt, domain: [2.0, 12.0], step: 0.5, gain: -2.0, target: 2.58, deadband: 0.1}
+  - {name: tilt_core, kind: latency, tenant: T2, param: tilt, domain: [2.0, 12.0], step: 0.5, gain: 0.964, target: 4.15, deadband: 0.5}
+  - {name: tput_T1, kind: throughput, tenant: T1, param: quota_T1, domain: [10.0, 58.0], step: 1.0, gain: 2.4, target: 2.58, deadband: 0.1}
+  - {name: lat_T2, kind: latency, tenant: T2, param: quota_T2, domain: [10.0, 54.0], step: 1.0, gain: 0.964, target: 4.15, deadband: 0.5}
+  - {name: rob_T3, kind: throughput, tenant: T3, param: quota_T3, domain: [6.0, 40.0], step: 1.0, gain: 3.0, target: 0.429, deadband: 0.1}
+# <<< CALIBRATED

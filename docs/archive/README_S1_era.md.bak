@@ -1,0 +1,220 @@
+# INTACT-RA-Agentic
+
+An agentic extension of INTACT-RA, the intent-aware arbitration layer that
+mediates between competing xApps in an O-RAN near-real-time RIC.
+
+INTACT-RA decides, every control epoch, which subset of the writes that
+xApps are asking for should actually be executed. It does this by holding
+a table of **cross-sensitivities** — how much each controllable parameter
+moves each tenant's intent margin — indexed by an operating **regime**, and
+by refusing any portfolio of writes whose robust lower bound would push a
+currently-satisfied intent below its safety floor.
+
+That design has one structural weakness, and this repository is about it.
+The sensitivity table is calibrated **offline**, with mobility disabled,
+and then frozen. The regime that indexes it is a per-tenant **measured
+load** label. So if the plant changes in a way that moves the true
+sensitivities *without* moving the load — users migrating outward at a
+constant offered rate, for instance — the table goes stale and nothing in
+the controller has any reason to look.
+
+INTACT-RA-Agentic adds four things, and the benchmark is built to measure
+each one separately:
+
+| component | what it replaces | file |
+|---|---|---|
+| Online recursive cross-sensitivity, with held-out promotion and rollback | the frozen offline table | `arbiter/sensitivity.py` |
+| GCN context head estimating resource pressure and coverage index | the measured-load regime label | `agent/context_head.py` |
+| Claim-aware PPO top-K candidate proposer | exhaustive portfolio enumeration | `agent/candidate_policy.py` |
+| Agentic supervisor issuing bounded calibration probes | nothing — this capability did not exist | `agent/supervisor.py` |
+
+### Baselines and diagnostic controls
+
+| name | what it is |
+|---|---|
+| `b3` | **The real B3** from the current codebase: proposal-aware, *unweighted* signed-margin portfolio selection over conflict-free, envelope-feasible sets. No intent-class weights, no robust safety bound, no risk term, no action cost. An earlier version of this package compared against static-priority and called it B3; that was wrong. |
+| `oracle` | The identical arbiter reading true local slopes from cloned paired finite differences. A yardstick, not a method. |
+| `b3-oracle` | B3's selection rule on true slopes. Isolates slope quality at B3's write rate. |
+| `b3-scrambled` | B3's rule on a table with the right magnitude distribution and permuted assignments: calibrated aggregate beliefs, zero specific knowledge. If this matches `b3`, the scenario cannot discriminate sensitivity models. |
+| `static-priority` | Rank by tenant weight × claim priority. A baseline, **not** B3. |
+
+The deep-RL agent does **not** choose the writes. It proposes a shortlist of
+candidate portfolios; a deterministic, auditable safety arbiter still makes
+the decision. This is deliberate: a learned policy that could authorise
+actuation directly would make every safety property a statistical claim
+about a neural network instead of a checkable invariant.
+
+Everything is NumPy. There is no PyTorch dependency: gradients are derived
+by hand and verified against central finite differences in the self-test
+(`scripts/selftest.py` checks them to ~1e-7 relative error). This keeps
+latency measurements honest — a near-real-time claim made on top of a
+framework whose scheduler you do not control is not a measurement — and
+makes runs bit-reproducible.
+
+---
+
+## Read `FINDINGS.md` first
+
+An oracle-first diagnostic was run on this package. **The headline claim
+is currently NOT supported**, and the reason is a property of the
+simulator rather than of the estimator: on S1 the PRB pool does not bind,
+so raising any quota is a free lunch and wIF tracks write rate rather than
+slope quality. Perfect knowledge of the current sensitivities buys
++0.0046 wIF over a frozen table.
+
+`FINDINGS.md` records the measurements, the rejected hypotheses (including
+a threshold-aligned objective that made everything worse), and which
+handoff-reported bugs were confirmed, corrected or refuted.
+
+Two diagnostic tools exist to stop this recurring, and they should be run
+before any benchmark: `scripts/probe_zerosum.py` and
+`scripts/oracle_diagnostic.py`.
+
+## Installation
+
+```bash
+cd intact_agentic_v1
+python3 -m pip install -r requirements.txt
+python3 scripts/selftest.py --fast          # ~60 s, no experiments
+```
+
+Requires Python 3.10+. Nothing else: numpy, pandas, scipy, matplotlib,
+PyYAML, scikit-learn.
+
+**Start with `RUNBOOK.md`.** It gives the exact commands in order, says
+which steps are automated and which need a decision from you, and explains
+how to read every output. This file explains what the pieces *are*; the
+runbook explains what to *do*.
+
+---
+
+## Layout
+
+```
+intact_agentic/
+  types.py            Scope, Kind, Direction, Outcome; Tenant, Intent,
+                      Claim, Write, Decision; Registry (mid-run arrivals)
+  config.py           YAML base+scenario merge, dotted overrides,
+                      validation, registry construction, fingerprinting
+  methods.py          the 12-method registry: what each controller IS
+  experiment.py       THE epoch loop. One loop runs every method.
+  gates.py            scenario-validity gates; refuses degenerate setups
+  telemetry.py        CSV sinks + the metric catalogue
+  xapps.py            the black-box xApps and the shared proposal stream
+
+  ran/
+    channel.py        3GPP TR 38.901 UMa path loss, LOS probability,
+                      Gudmundson shadowing, speed-dependent fading,
+                      3D antenna pattern with electrical downtilt,
+                      thermal noise, 38.214 CQI/MCS, BLER, HARQ
+    mobility.py       RWP with persistent per-tenant placement, coherent
+                      group drift, diurnal breathing
+    traffic.py        CBR / Poisson / on-off sessions, phase-offset load
+                      profiles, per-slice QoS demands. Strictly exogenous.
+    simulator.py      the plant: PF scheduling, queues, drops, delay,
+                      actuation lag, reconfiguration transients,
+                      mid-run slice activation, KPM assembly
+
+  arbiter/
+    margins.py        margin g = d(KPI - target)/|target|, wIF
+    sensitivity.py    StaticSensitivity (frozen), OnlineSensitivity (RLS
+                      with forgetting, hierarchical regime back-off,
+                      held-out promotion), the offline sweep
+    regime.py         Cell / TenantLoad / Learned / Oracle / Fixed
+    core.py           C1 and C2 feasibility, trust region, portfolio
+                      scoring, robust safety floor, ordered execution
+    oracle.py         true finite-difference slopes — a yardstick, not a
+                      method
+
+  agent/
+    nn.py             Param/Module/Linear/ReLU/Tanh/Adam, hand-derived
+    gcn.py            bipartite session-slice GCN encoder
+    context_head.py   predicts (resource pressure, coverage index)
+    candidate_policy.py  PPO over claim inclusion; top-K portfolios
+    supervisor.py     staleness detection, value-of-information probes,
+                      promotion and rollback, structured explanations
+
+  report/
+    metrics.py        wIF, safety crossings, prediction error, search
+                      regret, adaptation delay, paired bootstrap
+    figures.py        benchmark figures and the RAN causal chain
+    interpret.py      writes the findings in prose, including the
+                      unfavourable ones
+
+configs/
+  base.yaml           the plant, tenants, intents, claims, xApps, agent
+  scenarios/          S0 stationary (negative control), S1 edge drift
+                      (headline), S2 traffic shift, S3 new tenant,
+                      S4 interference
+
+scripts/              selftest, calibrate, validate_scenarios,
+                      run_experiment, run_benchmark, make_figures,
+                      make_report
+```
+
+---
+
+## The three design decisions that make the benchmark mean anything
+
+A comparison between arbitration policies is worthless if the plant lets a
+degenerate controller win. Two degenerate controllers exist, and the
+scenario has to defeat both.
+
+**1. Writing must cost something, or "accept everything" wins.**
+Every executed write reprograms the O-DU: affected slices lose
+`reconfig_loss_frac` of their capacity for `reconfig_slots` slots, a
+cell-scope write charges every slice, and two writes to one slice in one
+epoch charge twice. The self-test measures this directly (a single
+cell-scope write costs ~37% of delivered throughput over the transient
+window). Without it, churn is free and the correct policy is to accept
+everything.
+
+**2. The plant must be non-stationary, or "reject everything" wins.**
+Mobility and phase-offset traffic keep moving the right operating point, so
+frozen controls drift away from it. A previous version of this line of work
+failed exactly here: doing nothing beat every controller, because the plant
+was stationary. Gate G7 now checks for it automatically and refuses the
+scenario if it recurs.
+
+**3. The staleness must be emergent, not scripted.**
+In S1, T1's users migrate outward at a **constant offered load**, so the
+load label that indexes INTACT-RA's table does not move. What moves is the
+physics. The electrical downtilt aims the antenna's main lobe at a ground
+radius of `h_bs / tan(θ)`; users inside that radius gain from more
+downtilt and users beyond it lose. As T1 walks across the beam peak,
+`d(g_i1)/d(tilt)` goes from **+0.030 to −0.016** and `d(g_i2)/d(tilt)` from
+**+0.001 to −0.194**. Both **flip sign**.
+
+That is the sharpest available form of table staleness: the frozen table
+does not merely mis-estimate an effect size, it recommends the *opposite
+action*, and it does so with the small standard error the offline sweep
+legitimately measured. This is emergent from TR 38.901, not a coded step
+change, and `gates.py` verifies it on every run by measuring true slopes
+twice on clones of the same trajectory.
+
+---
+
+## Honest notes
+
+- **Unknown is not zero.** `StaticSensitivity` returns slope 0.0 *and*
+  sigma 0.0 for a missing table entry, which asserts that an uncalibrated
+  knob affects nobody. That is the documented failure mode, it is asserted
+  as a test, and S3 is built to expose it. `OnlineSensitivity` instead
+  reports the full unknown sigma so the robust bound refuses and the
+  supervisor schedules a probe.
+
+- **Honesty about uncertainty has a cost.** An online estimator's in-run
+  standard error is legitimately wider than a clean offline sweep's, and a
+  robust arbiter converts wider uncertainty into fewer writes. On a
+  stationary plant (S0) the agentic method should therefore be at best
+  neutral. That is reported, not hidden — it is why S0 exists.
+
+- **The oracle is a bound, not a method.** It reads true finite-difference
+  slopes from RAN clones. It says how much of the remaining gap better
+  estimation could still buy.
+
+- **What the simulator does not model** is listed explicitly in
+  `docs/METRICS.md` and repeated in every generated report: handover,
+  uplink, per-subband CQI, MIMO rank adaptation, carrier aggregation,
+  TCP or any transport reaction, core-network delay, and energy in watts.
+  No figure in this repository should be read as evidence about any of them.

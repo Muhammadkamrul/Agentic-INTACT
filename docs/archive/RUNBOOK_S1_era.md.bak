@@ -1,0 +1,323 @@
+# RUNBOOK
+
+Every command you need, in the order you need it, with the expected output
+and how to read it.
+
+**Convention used throughout:** each step is marked
+
+- **[AUTO]** — the script does all of it. You run one command and read the result.
+- **[DECISION]** — the script computes numbers and prints a recommendation,
+  but *you* decide whether to edit a config file. Nothing is edited for you.
+
+Every command is run from the repository root (the directory containing
+`configs/`, `scripts/` and `intact_agentic/`).
+
+---
+
+## Step 0a — Is the scenario worth benchmarking?  **[AUTO, DO THIS FIRST]**
+
+Two sessions of controller tuning were spent on a scenario that could not
+support the claim. These two commands would have caught it in four
+minutes. Run them before anything else, on any new or edited scenario.
+
+```bash
+python3 scripts/probe_zerosum.py      --scenario S1_edge_drift
+python3 scripts/oracle_diagnostic.py  --scenario S1_edge_drift
+```
+
+**`probe_zerosum.py`** raises one tenant's quota and measures who pays.
+`NET ~ 0` means allocation is zero-sum and the choice of write is the
+decision. `NET >> 0` means unused quota costs nobody anything, "raise
+everything" dominates, and wIF will track write RATE rather than slope
+quality — a benchmark in that regime cannot support any claim about
+estimation.
+
+**`oracle_diagnostic.py`** runs the identical arbiter with true slopes, the
+frozen table, scrambled slopes and the online estimator, and writes
+`ORACLE_DIAGNOSTIC.md` with an explicit CASE A / CASE B verdict.
+
+- **CASE A** (`oracle - frozen < 0.030`): stop. Do not tune the agent —
+  there is nothing to win. Fix the scenario.
+- **CASE B**: exploitable; agent work is justified.
+
+The scrambled-table arm is the one that cannot be argued with. If a
+controller scores the same on permuted slopes as on true ones, the
+scenario is not measuring sensitivity knowledge at all.
+
+See `FINDINGS.md` for what these returned on S1 and S6.
+
+---
+
+## Step 0b — Install and self-test  **[AUTO]**
+
+```bash
+python3 -m pip install -r requirements.txt
+python3 scripts/selftest.py --fast
+```
+
+Takes about a minute. You should see `11 passed, 0 failed`.
+
+Then run the full version, which actually executes short experiments:
+
+```bash
+python3 scripts/selftest.py --epochs 40
+```
+
+Takes about five minutes and builds the offline sensitivity table on the
+way (cached afterwards). You should see `23 passed, 0 failed`.
+
+**What it is checking, and why each one matters:**
+
+| check | what a failure means |
+|---|---|
+| gradients vs finite differences | a sign error in hand-derived backprop. Does not crash; just trains to a worse optimum and looks like a hyperparameter problem for weeks. |
+| KPMs physically admissible | throughput exceeding Shannon capacity, BLER outside [0,1], delay below the processing floor. The plant is broken. |
+| cell contended but not saturated | below ~45% utilisation claims stop competing and arbitration has nothing to do; above ~96% queueing dominates everything. |
+| tenants radio-distinguishable | if every tenant has the same SINR there is no coverage-limited vs capacity-limited split, and the channel axis of the regime space is worthless. |
+| write costs throughput | if reconfiguration is free, "accept everything" is the correct policy and the benchmark is degenerate. |
+| xApps polled twice give the same answer | a stateful controller polled twice returns two different values; the arbiter would then score one value and execute another. |
+| unknown entry reports full sigma | the difference between "this knob does nothing" and "I have never measured this knob". |
+| same seed → identical wIF | non-determinism. Every result becomes unreproducible. |
+| telemetry on/off → identical wIF | logging is consuming random numbers, so every logged run is a *different experiment* from the unlogged one. |
+| resumed run → identical wIF | checkpointing is lossy, so a resumed overnight job is not the run you thought you were continuing. |
+| C1 / C2 violations = 0 | the arbiter executed two writes to one parameter, or blew a tenant's envelope. |
+| agentic fits the near-RT budget | the proposed method cannot be deployed. (Exhaustive enumeration is *expected* to overrun — that is what the top-K proposer is for, and the script prints both numbers.) |
+
+**If anything fails, stop.** Every number produced after a failed self-test
+is suspect.
+
+---
+
+## Step 1 — Calibrate  **[DECISION]**
+
+```bash
+python3 scripts/calibrate.py --scenario S1_edge_drift
+```
+
+Takes 10–20 minutes. It runs four things and writes
+`artifacts/S1_edge_drift/calibration.json`.
+
+**1. Passive-plant KPI survey.** Measures what the plant actually does with
+no controller. This is where intent targets come from. A target set by eye
+produces an intent that is always met or never met, and either way it
+carries no information about the controller. Output looks like:
+
+```
+    i1    T1 throughput_mbps  configured      1.70   measured median      1.69
+    i2    T1 delay_p50_ms     configured    115.00   measured median    113.40
+```
+
+**DECISION:** any line flagged `<-- CHANGE` differs from the measured
+median by more than 12%. Copy the suggested value into the matching intent
+in `configs/base.yaml` and re-run this script. Nothing is edited for you.
+
+**2. Resource-pressure band edges.** The regime space bands tenants by
+resource pressure ρ = demand / effective capacity. Those bands must line up
+with the load scales the offline sweep uses for its three table columns, or
+every lookup reads the wrong column. Prints:
+
+```
+    => arbiter.regime_pressure_edges: [0.412, 0.568]   (configured: [0.412, 0.568])
+```
+
+**DECISION:** if the two differ, update `arbiter.regime_pressure_edges` in
+`configs/base.yaml`.
+
+**3. Cold-start proxy fit.** Before the GCN context head has trained, it
+falls back to an analytic pressure estimate from KPM fields. That estimate
+is biased, and the fit corrects it. **DECISION:** copy
+`agent.context.rho_proxy_scale` and `rho_proxy_offset` if they have moved.
+
+**4. The offline sensitivity sweep.** This is INTACT-RA's frozen table:
+mobility disabled, every other knob frozen, each parameter stepped across
+its trust region, common random numbers across values, OLS slope with a
+standard error. Cached at `artifacts/sensitivity_prior.json` and shared by
+every method — re-sweeping per method would make the comparison depend on
+sweep noise.
+
+Watch for this warning:
+
+```
+    WARNING: the typical slope is not distinguishable from noise.
+```
+
+It means `median sigma/|slope| > 3`. The robust arbiter will then refuse
+almost every write and every controller will look identically passive.
+**DECISION:** raise `calibration.replicates` or `calibration.measure_slots`
+and re-run with `--force`.
+
+---
+
+## Step 2 — Screen the scenarios  **[AUTO]**
+
+```bash
+python3 scripts/validate_scenarios.py
+```
+
+Takes 20–40 minutes. Runs a short version of each scenario with the five
+methods needed to evaluate the gates, then **refuses** the scenarios that
+cannot support the claim. Exits non-zero if any scenario is refused, so it
+can gate a longer job:
+
+```bash
+python3 scripts/validate_scenarios.py --scenarios S1_edge_drift \
+  && python3 scripts/run_benchmark.py --scenario S1_edge_drift
+```
+
+**The gates, and what a failure is telling you:**
+
+| gate | fails when |
+|---|---|
+| G1 workload identity | one method is being offered systematically more to work with than another. The comparison is not a comparison. |
+| G2 arbitration winnable | portfolio choice never changes the outcome. |
+| G3 drift materiality | the true slopes did not move by more than the offline calibration's own claimed precision. An online estimator is being asked to beat a table that is still right, and it will lose. |
+| G4 regime disagreement | per-tenant and cell-average labels almost always agree, so the per-tenant machinery cannot be what is doing the work. |
+| **G7 control gain** | **doing nothing beats every controller.** The plant is stationary or writing is free. This is the gate a previous version of this work failed. |
+| G8 conflict gain | accepting everything beats every controller. There is no conflict worth mediating. |
+| G9 agentic gain | the agentic method does not beat the frozen one on this scenario. |
+| G10 safety separation | a deliberative controller is not meaningfully safer than accepting everything. |
+
+`S0_stationary` is **expected** to fail G3 and G9. It is the negative
+control: it demonstrates that the agentic advantage in S1 comes from
+adaptation and not from the extra machinery being generically better.
+
+---
+
+## Step 3 — Run the benchmark  **[AUTO]**
+
+```bash
+python3 scripts/run_benchmark.py --scenario S1_edge_drift \
+    --methods full --seeds 20260925,20260926,20260927,20260928,20260929
+```
+
+Budget roughly 90 minutes for 12 methods × 5 seeds × 800 epochs with
+telemetry on. Add `--no-telemetry` to roughly halve it, at the cost of the
+RAN figures.
+
+**This is resumable.** Every run checkpoints every 50 epochs and a
+completed run is skipped on re-invocation. If the job is interrupted,
+re-run the identical command; it picks up where it stopped. Use `--force`
+to recompute anyway.
+
+Smaller variants:
+
+```bash
+# just the headline five methods, one seed — about 8 minutes
+python3 scripts/run_benchmark.py --scenario S1_edge_drift --seeds 20260925
+
+# just the component ablations
+python3 scripts/run_benchmark.py --scenario S1_edge_drift --methods ablations
+
+# one method, for debugging
+python3 scripts/run_experiment.py --method intact-ra-agentic --epochs 200
+
+# any config value, from the command line
+python3 scripts/run_benchmark.py --set arbiter.uncertainty_beta=1.0 run.epochs=400
+```
+
+**Diagnostics run automatically at the end** — the validity gates, the
+paired bootstrap over seeds, and the written interpretation. You do not run
+them separately. If a critical gate fails the script says so and exits 2.
+
+---
+
+## Step 4 — Figures and report  **[AUTO]**
+
+```bash
+python3 scripts/make_figures.py --scenario S1_edge_drift
+python3 scripts/make_report.py  --scenario S1_edge_drift
+```
+
+A couple of minutes. Produces `results/S1_edge_drift/REPORT.md` — one
+self-contained document with the plant description, the drift evidence, the
+tables, the gate verdicts, the interpretation and every figure inline.
+There is no separate addendum to cross-reference.
+
+---
+
+## What you get, and how to read it
+
+```
+results/S1_edge_drift/
+  REPORT.md              <- read this one
+  INTERPRETATION.md      the findings in prose, including unfavourable ones
+  GATES.md               scenario validity verdicts
+  DRIFT.md               true slopes early vs late, with sign flips flagged
+  summaries.json         per-method aggregates across seeds
+  per_seed.json          every individual run
+  bootstrap_ci.json      confidence intervals
+  paired.json            paired bootstrap, agentic minus INTACT-RA
+  figures/               fig1..fig11
+  <method>/seed<N>/
+    summary.json         that run's metrics
+    epochs.csv           one row per epoch
+    checkpoint.pkl       resume point
+    csv/                 per-slot telemetry (13 files)
+```
+
+### The figures
+
+| figure | question it answers |
+|---|---|
+| fig1 headline | wIF, safety crossings, writes/epoch, p95 latency. All four together — a controller that wins on wIF while causing more crossings has not won. |
+| fig2 per-intent | does the average hide one tenant being sacrificed? |
+| fig3 safety vs value | the trade-off plane. The claim is the upper-left corner. |
+| fig4 ablation | what each component contributes. Bars above zero mean removing it *helped*. |
+| fig5 drift response | rolling wIF and prediction error through the plant change. The shape either side is the point; an end-of-run number cannot show it. |
+| fig6 latency | decision-latency CDF against the near-RT budget. |
+| fig7 slope drift | true slopes early vs late. Shaded quadrants are entries whose recommendation **reversed**. |
+| fig8 RAN causal chain | mobility → SINR → MCS → capacity → offered → allocation → throughput → delay, on one shared time axis. Drop a vertical line anywhere and read the whole chain. |
+| fig9 cell overview | load, radio quality, fairness, reconfiguration cost. |
+| fig10 distributions | what the time series hides. A mean SINR of 15 dB with a 20 dB spread is a different cell from a tight 15 dB. |
+| fig11 agent internals | candidates scored, policy entropy, probes issued, residuals, promotions. |
+
+### Reading the headline table
+
+- **wIF** — weighted intent fulfilment, the headline. Same definition as in
+  the INTACT-RA paper, so the numbers are directly comparable.
+- **safety crossings** — epochs where an intent was at or above its floor
+  before the writes and below it after. Only counted when a write actually
+  happened: a drift-induced dip that no controller caused is not a safety
+  crossing, and counting it would make a do-nothing controller look reckless.
+- **worst intent** — the least-served intent's fulfilment. Catches an
+  average propped up by sacrificing one tenant.
+- **prediction MAE** — how well the sensitivity model predicted the margin
+  change it caused. This is the model-quality metric, and it can move in the
+  *opposite* direction to wIF. When it does, read the note in
+  `INTERPRETATION.md`.
+- **candidates** — portfolios scored per epoch. The gap between exhaustive
+  enumeration and the top-K proposer is what the latency column is buying.
+
+---
+
+## Troubleshooting
+
+**Every controller writes almost nothing and all methods look the same.**
+The robust safety bound is vetoing everything. Check the sweep quality line
+from Step 1: if `median sigma/|slope| > 3`, the slopes are not identified
+and no arbiter can act on them. Raise `calibration.replicates`. If the
+sweep is clean, `arbiter.lambda_risk` or `arbiter.action_cost` is too high
+relative to the achievable gains.
+
+**The agentic method predicts better but scores worse.** This is a real
+effect, not a bug, and `INTERPRETATION.md` will flag it. An online
+estimator's honest in-run standard error is wider than a clean offline
+sweep's, and a robust arbiter converts uncertainty into inaction. Check the
+writes-per-epoch column. If the agentic method is writing substantially
+less, the scenario has not yet made the frozen table wrong enough to repay
+the cost of admitting what it does not know. Check `DRIFT.md` for sign
+flips: if there are none, that is the explanation.
+
+**G7 fails — all-reject wins.** The plant is too stationary, or writing is
+too cheap. Raise `ran.actuation.reconfig_loss_frac`, or make the drift or
+the traffic phases more aggressive. Do not proceed until this passes.
+
+**G8 fails — all-accept wins.** Writing is too cheap. Raise
+`reconfig_loss_frac` or `reconfig_slots`.
+
+**Runs are slow.** `--no-telemetry` roughly halves the time and costs you
+only the RAN figures. `report.telemetry.ue_every_slots` controls per-UE
+sampling density.
+
+**A run died halfway.** Re-run the identical command. Completed runs are
+skipped and partial ones resume from their last checkpoint.

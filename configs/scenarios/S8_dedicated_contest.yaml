@@ -1,0 +1,100 @@
+# ===========================================================================
+# S8 -- Dedicated-reservation contest: THE HEADLINE SCENARIO
+# ===========================================================================
+# Every condition below is a physical precondition for current sensitivity
+# knowledge to have decision value.  Each was established by a paired
+# counterfactual measurement BEFORE any controller was scored on S8, and
+# each maps to one rung of the comparison ladder.  These conditions are the
+# SCOPE of the headline claim and must be reported with it.
+#
+# (1) NORMALISED DEDICATED RESERVATIONS          (choice beats count)
+#     ran.allocation: dedicated.  A slice's quota reserves PRBs that no
+#     other slice may use; reservations are normalised so they never exceed
+#     the pool (3GPP dedicated-ratio semantics).  Quotas start summing to
+#     118 > 106 PRB, so the pool is always fully reserved: granting one
+#     tenant more shrinks every other reservation, and giving PRBs to a
+#     tenant that cannot use them wastes them.
+#
+# (2) OUT-OF-PHASE PER-TENANT LOAD               (B3 -> INTACT-RA)
+#     Measured, paired, +8 PRB to T1:
+#         T1 0.6x / T2 1.6x :  dT1 +0.001  dT2 -0.059   NET -0.070  harmful
+#         T1 1.6x / T2 0.6x :  dT1 +0.220  dT2  0.000   NET +0.207  helpful
+#     The SAME write changes sign with WHICH tenant is loaded.  T1 and T2
+#     alternate between 0.6x and 1.6x while the cell average barely moves.
+#     INTACT-RA reads each tenant's slopes from that tenant's own regime and
+#     gets both cases right; B3 reads one cell-average column for everyone.
+#
+# (3) OUTWARD MIGRATION AT CONSTANT LOAD         (INTACT-RA -> Agentic)
+#     T1 walks from ~163 m across the antenna beam peak (h_bs/tan 8deg =
+#     178 m).  Its spectral efficiency falls, so each reserved PRB is worth
+#     less to it, and d(g)/d(tilt) reverses sign.  Its offered LOAD is
+#     unchanged, so the per-tenant load label indexing INTACT-RA's frozen
+#     table does not move.  Only a current estimate can notice.
+#
+# (4) MODERATE ACTUATION COST                    (all-accept must lose)
+#     Reconfiguration transients make indiscriminate writing expensive.
+#
+# (5) CALIBRATED SETPOINTS                       (no ratchet)
+#     Intent targets and xApp setpoints at the passive-plant median, by
+#     scripts/calibrate_targets.py.
+
+_scenario_note: >
+  Normalised dedicated PRB reservations, out-of-phase per-tenant load and
+  constant-load outward migration of T1 across the antenna beam peak.
+  Each mechanism corresponds to one rung of the
+  B3 < INTACT-RA < INTACT-RA-Agentic <= Oracle ladder.
+
+run:
+  epochs: 800
+
+ran:
+  allocation: dedicated
+  initial_controls:
+    tilt: 8.0
+    quota_T1: 46.0
+    quota_T2: 42.0
+    quota_T3: 30.0
+  slices:
+    T1:
+      load_profile: {levels: [0.60, 1.60], hold_slots: 700, ramp_slots: 100, phase: 0}
+    T2:
+      load_profile: {levels: [1.60, 0.60], hold_slots: 700, ramp_slots: 100, phase: 0}
+    T3:
+      load_profile: {levels: [1.0], hold_slots: 1000000, phase: 0}
+  mobility:
+    mode: group_drift
+    drift:
+      tenants: [T1]
+      rate_m_per_slot: 0.0140
+      start_slot: 400
+      jitter_m_per_slot: 0.10
+    wander_radius_m: 35.0
+
+gates:
+  oracle_gain_min: 0.030
+  knowledge_gain_min: 0.050
+  control_gain_min: 0.030
+  conflict_gain_min: 0.030
+  agentic_gain_min: 0.010
+
+# >>> CALIBRATED -- written by scripts/calibrate_targets.py; do not edit by hand
+_replace_sections: [intents, xapps]
+intents:
+  - {iid: i1, tenant: T1, kpi: throughput_mbps, target: 1.556, direction: higher_better, pi_class: 1.0, weight: 1.0, epsilon: 0.02}
+  - {iid: i2, tenant: T1, kpi: delay_p50_ms, target: 2.90, direction: lower_better, pi_class: 1.0, weight: 1.0, epsilon: 0.02}
+  - {iid: i3, tenant: T2, kpi: throughput_mbps, target: 1.883, direction: higher_better, pi_class: 1.0, weight: 1.0, epsilon: 0.02}
+  - {iid: i4, tenant: T2, kpi: delay_p90_ms, target: 2.38, direction: lower_better, pi_class: 1.0, weight: 1.0, epsilon: 0.02}   # delay_p90_ms: delay_p50 IQR degenerate here
+  - {iid: i5, tenant: T3, kpi: throughput_mbps, target: 0.662, direction: higher_better, pi_class: 1.0, weight: 1.0, epsilon: 0.02}
+  - {iid: i6, tenant: T3, kpi: delay_p90_ms, target: 5.62, direction: lower_better, pi_class: 1.0, weight: 1.0, epsilon: 0.02}   # delay_p90_ms: delay_p50 IQR degenerate here
+  - {iid: i7, tenant: HOST, kpi: txpower_dbm, target: 40.0, direction: lower_better, pi_class: 1.0, weight: 1.0, epsilon: 0.0}
+xapps:
+  - {name: energy, kind: energy, tenant: HOST, param: txpower, domain: [32.0, 46.0], step: 0.5, gain: 0.45, target: 36.5}
+  - {name: coverage, kind: coverage, tenant: HOST, param: txpower, domain: [32.0, 46.0], step: 0.5, gain: 0.55, edge_trigger: 0.548, sinr_target: 18.53}
+  - {name: tiltctl, kind: energy, tenant: HOST, param: tilt, domain: [2.0, 12.0], step: 0.5, gain: 0.5, target: 9.0, target_alt: 7.0, period: 40}
+  - {name: tput_T1, kind: throughput, tenant: T1, param: quota_T1, domain: [10.0, 58.0], step: 1.0, gain: 2.4, target: 1.556, deadband: 0.1}
+  - {name: lat_T2, kind: latency, tenant: T2, param: quota_T2, domain: [10.0, 54.0], step: 1.0, gain: 1.719, target: 2.33, deadband: 0.5}
+  - {name: rob_T3, kind: throughput, tenant: T3, param: quota_T3, domain: [6.0, 40.0], step: 1.0, gain: 3.0, target: 0.662, deadband: 0.1}
+  - {name: steer_T1, kind: steering, tenant: T1, param: schedw_T1, domain: [0.5, 2.0], step: 0.05, gain: 0.55, target: 71.4, deadband: 4.0}
+  - {name: steer_T2, kind: steering, tenant: T2, param: schedw_T2, domain: [0.5, 2.0], step: 0.05, gain: -0.45, target: 71.4, deadband: 4.0}
+  - {name: mcs_T3, kind: robustness, tenant: T3, param: mcs_T3, domain: [8.0, 27.0], step: 1.0, gain: 0.55, target: 0.5}
+# <<< CALIBRATED

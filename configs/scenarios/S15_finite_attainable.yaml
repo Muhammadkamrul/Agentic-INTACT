@@ -1,0 +1,160 @@
+# ===========================================================================
+# S15 -- Finite contest, individually attainable, jointly infeasible
+# ===========================================================================
+# WHAT S15 CHANGES FROM S14
+# --------------------------
+# scripts/intent_attainability.py on S14: with the WHOLE cell every intent
+# was met (0.83-0.98), so the service targets are sound; but within each
+# tenant's envelope, with every other tenant yielding, five of six intents
+# stayed at 0.42-0.76.  The envelopes were too small for the loads, so most
+# intents were unwinnable under ANY allocation -- and an unwinnable intent
+# attracts capacity under a linear-margin objective without ever paying off.
+#
+# Design rule: every tenant's intents must be ATTAINABLE within its own
+# envelope when the others yield, while their COMBINED needs exceed the pool
+# during overload.  Individually feasible, jointly infeasible -- the
+# situation arbitration exists for.  Loads are reduced accordingly
+# (T1 2.0 -> 1.7, T2 4.0 -> 3.0, T3 1.6 -> 1.0 Mb/s/UE).  T2's 20 ms delay
+# bound still failed within a 44-PRB envelope (0.66; 0.92 with the whole
+# cell), so the latency-critical slice contracts a 52-PRB envelope instead;
+# the service requirement itself is unchanged.  Even with the WHOLE cell
+# that 20 ms p90 bound was met only 92% of the time, so it sits at the edge
+# of what this radio can deliver; it is relaxed to 30 ms, still an
+# enterprise-grade latency class.
+#
+# Designed against the three requirements stated for the benchmark:
+#
+# (1) ALL-ADMIT MUST FAIL THROUGH C1 AND C2, AND THE RAN MUST FEEL IT.
+#     B0 now follows the original code exactly: every xApp writes its raw
+#     request, later writes see earlier ones, violating writes still land.
+#     - C2: T1 and T2 each hold TWO allocative knobs on their PRB resource
+#       (quota_Tx from a service-ratio xApp, quota_Txb from a latency xApp).
+#       The RAN SUMS them, and each knob's range lets the pair exceed the
+#       tenant envelope.  Envelopes (48 + 44 + 36 = 128) are oversold
+#       relative to the 106-PRB pool, so reservations can also exceed the
+#       pool; the RAN then normalises, shaving every tenant.
+#     - C1: T3 has TWO xApps writing the SAME knob, quota_T3, with
+#       different objectives.  Both writes land (last writer wins) and each
+#       pays its own reconfiguration transient.
+#     - Finite resources: with c2_cell_pool the deliberative methods must
+#       REJECT any claim whose reservation would not fit the pool.
+#
+# (2) ALL-REJECT MUST NOT WIN BY DEFAULT.
+#     Intents are SERVICE REQUIREMENTS, not percentiles of the untouched
+#     plant: every tenant must deliver >= 95% of its offered traffic, plus
+#     a class delay bound at p90 (eMBB 100 ms, enterprise 20 ms, mMTC
+#     300 ms).  The provisioned split cannot meet them in overload phases;
+#     only moving reservation toward the overloaded tenant can.
+#
+# (3) THE LADDER MECHANISMS ARE KEPT.
+#     - Partially coincident T2/T3 overload -> per-tenant beats cell-level.
+#     - T1 migrates INWARD at constant load (edge -> near the site): its
+#       need collapses while its load label does not move, so a table
+#       calibrated at the edge keeps over-valuing T1's reservation.
+#
+# Epochs 0-99: stationary burn-in, unscored.  Scoring from epoch 100 from a
+# common plant state for every method.
+
+_scenario_note: >
+  Finite PRB pool with oversold envelopes, two allocative knobs per tenant
+  (C2), two writers on one knob (C1), service-defined intents, partially
+  coincident T2/T3 overload and constant-load inward migration of T1.
+
+run:
+  epochs: 500
+  burn_in_epochs: 100
+
+arbiter:
+  c2_cell_pool: true
+
+_replace_sections: [tenants, intents, claims, xapps]
+
+tenants:
+  - {tid: T1, omega: 1.0, rho_min: 0.80, envelope: {prb: 48.0}}
+  - {tid: T2, omega: 1.0, rho_min: 0.80, envelope: {prb: 52.0}}
+  - {tid: T3, omega: 1.0, rho_min: 0.80, envelope: {prb: 36.0}}
+  - {tid: HOST, omega: 1.0, rho_min: 0.60, is_host: true, envelope: {}}
+
+intents:
+  - {iid: i1, tenant: T1, kpi: served_ratio, target: 0.95, direction: higher_better,
+     pi_class: 1.0, weight: 1.0, epsilon: 0.02}
+  - {iid: i2, tenant: T1, kpi: delay_p90_ms, target: 100.0, direction: lower_better,
+     pi_class: 1.0, weight: 1.0, epsilon: 0.02}
+  - {iid: i3, tenant: T2, kpi: served_ratio, target: 0.95, direction: higher_better,
+     pi_class: 1.0, weight: 1.0, epsilon: 0.02}
+  - {iid: i4, tenant: T2, kpi: delay_p90_ms, target: 30.0, direction: lower_better,
+     pi_class: 1.0, weight: 1.0, epsilon: 0.02}
+  - {iid: i5, tenant: T3, kpi: served_ratio, target: 0.95, direction: higher_better,
+     pi_class: 1.0, weight: 1.0, epsilon: 0.02}
+  - {iid: i6, tenant: T3, kpi: delay_p90_ms, target: 300.0, direction: lower_better,
+     pi_class: 1.0, weight: 1.0, epsilon: 0.02}
+
+claims:
+  - {jid: j1, xapp: srv_T1, tenant: T1, param: quota_T1,  scope: slice, kind: allocative,
+     domain: [6.0, 40.0], step: 1.0, max_step_frac: 0.20, resource: prb, d_bar: 48.0, r_j: 0.6}
+  - {jid: j2, xapp: lat_T1, tenant: T1, param: quota_T1b, scope: slice, kind: allocative,
+     domain: [4.0, 24.0], step: 1.0, max_step_frac: 0.25, resource: prb, d_bar: 48.0, r_j: 0.6}
+  - {jid: j3, xapp: srv_T2, tenant: T2, param: quota_T2,  scope: slice, kind: allocative,
+     domain: [6.0, 40.0], step: 1.0, max_step_frac: 0.20, resource: prb, d_bar: 52.0, r_j: 0.6}
+  - {jid: j4, xapp: lat_T2, tenant: T2, param: quota_T2b, scope: slice, kind: allocative,
+     domain: [4.0, 28.0], step: 1.0, max_step_frac: 0.25, resource: prb, d_bar: 52.0, r_j: 0.6}
+  - {jid: j5, xapp: srv_T3, tenant: T3, param: quota_T3,  scope: slice, kind: allocative,
+     domain: [6.0, 36.0], step: 1.0, max_step_frac: 0.20, resource: prb, d_bar: 36.0, r_j: 0.6}
+  - {jid: j6, xapp: lat_T3, tenant: T3, param: quota_T3,  scope: slice, kind: allocative,
+     domain: [6.0, 36.0], step: 1.0, max_step_frac: 0.20, resource: prb, d_bar: 36.0, r_j: 0.6}
+
+# Every xApp closes its loop on ITS tenant's intent: push reservation up when
+# the intent is missed, hand it back when comfortably met.
+xapps:
+  - {name: srv_T1, kind: throughput, tenant: T1, param: quota_T1, kpi: served_ratio,
+     domain: [6.0, 40.0], step: 1.0, gain: 25.0, target: 0.95, deadband: 0.02}
+  - {name: lat_T1, kind: latency,    tenant: T1, param: quota_T1b, kpi: delay_p90_ms,
+     domain: [4.0, 24.0], step: 1.0, gain: 0.05, target: 100.0, deadband: 10.0}
+  - {name: srv_T2, kind: throughput, tenant: T2, param: quota_T2, kpi: served_ratio,
+     domain: [6.0, 40.0], step: 1.0, gain: 25.0, target: 0.95, deadband: 0.02}
+  - {name: lat_T2, kind: latency,    tenant: T2, param: quota_T2b, kpi: delay_p90_ms,
+     domain: [4.0, 28.0], step: 1.0, gain: 0.20, target: 30.0, deadband: 3.0}
+  - {name: srv_T3, kind: throughput, tenant: T3, param: quota_T3, kpi: served_ratio,
+     domain: [6.0, 36.0], step: 1.0, gain: 25.0, target: 0.95, deadband: 0.02}
+  - {name: lat_T3, kind: latency,    tenant: T3, param: quota_T3, kpi: delay_p90_ms,
+     domain: [6.0, 36.0], step: 1.0, gain: 0.02, target: 300.0, deadband: 30.0}
+
+ran:
+  allocation: dedicated_shared
+  envelopes:
+    T1: {prb: 48.0}
+    T2: {prb: 52.0}
+    T3: {prb: 36.0}
+  initial_controls:
+    txpower: 40.0
+    tilt: 8.0
+    quota_T1: 26.0            # T1 provisioned for the EDGE: 26 + 12 = 38
+    quota_T1b: 12.0
+    quota_T2: 22.0            # 22 + 10 = 32
+    quota_T2b: 10.0
+    quota_T3: 30.0            # total reserved 100 of 106; 6 shared
+  slices:
+    T1:
+      load_mbps_per_ue: 1.7
+      placement: {radius_min_m: 250.0, radius_max_m: 310.0}
+      load_profile: {levels: [1.0], hold_slots: 1000000, phase: 0}
+    T2:
+      load_mbps_per_ue: 3.0
+      load_profile: {levels: [1.60, 1.60, 0.60, 0.60], hold_slots: 350, ramp_slots: 60, phase: 0}
+    T3:
+      load_mbps_per_ue: 1.0
+      load_profile: {levels: [1.60, 1.60, 0.60, 0.60], hold_slots: 350, ramp_slots: 60, phase: 3}
+  mobility:
+    mode: group_drift
+    drift:
+      tenants: [T1]
+      rate_m_per_slot: -0.028     # inward: ~275 m -> ~100 m
+      start_slot: 1600
+      jitter_m_per_slot: 0.10
+    wander_radius_m: 35.0
+
+gates:
+  oracle_gain_min: 0.030
+  control_gain_min: 0.030
+  conflict_gain_min: 0.030
+  agentic_gain_min: 0.010

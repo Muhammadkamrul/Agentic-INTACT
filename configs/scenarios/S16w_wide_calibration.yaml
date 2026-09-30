@@ -1,0 +1,183 @@
+# ===========================================================================
+# S16w -- S16 with a WIDER offline calibration range (diagnostic only)
+#   Tests whether per-tenant INTACT-RA loses on S16 because its per-tenant
+#   lookups read columns measured far outside the tenants' operating range
+#   (sweep 0.70/1.00/1.35 vs per-tenant load swings of 0.3-2.0).  Only the
+#   sweep scales and the matching band edges change.
+# ===========================================================================
+# WHY S16 EXISTS
+# --------------
+# scripts/control_gain.py on S15 (arbiter-free, 2 seeds):
+#     floor   (provisioned default, = all-reject)   0.549
+#     ceiling (demand-tracking: knows true need)     0.563    gap +0.014
+# Even an ideal controller that knows every tenant's current load AND
+# geometry met intents only 56% of the time and beat doing nothing by
+# 0.014.  S15 was simultaneously too infeasible (low ceiling) and too kind
+# to the default (tiny gap), so no controller could have shown much.
+#
+# DESIGN RULE
+#   High ceiling: the tenants' COMBINED need fits the pool at almost every
+#     moment, so an ideal allocation meets nearly every intent.
+#   Low floor: that feasible allocation CHANGES over time, so any fixed
+#     split is wrong most of the time.  T2 and T3 swing 1.8x <-> 0.4x
+#     exactly out of phase: their combined need is roughly constant and
+#     fits the pool, but it flips between them.  The full pool is
+#     provisioned (106 of 106), so there is no shared remainder to absorb
+#     the swing, and dedicated PRBs cannot be borrowed: a fixed split
+#     starves whichever tenant is overloaded while PRBs sit idle in the
+#     light one.
+#   T1 migrates inward at constant load, so its edge-sized reservation is
+#     wasted after the migration -- the part a frozen table gets wrong.
+#
+# Sizing is from MEASURED per-PRB throughput, not estimated spectral
+# efficiency (a first attempt used optimistic estimates and was jointly
+# infeasible in both phases: ~117-124 PRB needed against 106).  T2 carries
+# ~1.3 Mb/s/PRB, so at 3.0 Mb/s/UE it needs ~45 PRB overloaded; T3 at
+# 0.85 Mb/s/UE ~40; a light tenant still needs ~20 to keep its delay down
+# (cutting it to 12 sent its p90 delay from 58 ms to over a second); T1 at
+# 1.0 Mb/s/UE ~25-30 at the edge.  Worst moment ~90 PRB of 106.
+# The default is provisioned at each tenant's AVERAGE need (T2 36, T3 32,
+# T1 edge-sized 38), so each overloaded tenant is short-changed.
+#
+# SCOPE: hard slicing (see ran.allocation).
+#
+# Everything else -- service intents, B0 semantics, C1/C2 with the finite
+# pool, burn-in, envelopes oversold relative to the pool -- is as in S15.
+
+_scenario_note: >
+  Finite, fully provisioned PRB pool with oversold envelopes, two allocative
+  knobs per tenant (C2), two writers on one knob (C1), service-defined
+  intents, exactly out-of-phase T2/T3 load swings whose combined need fits
+  the pool, and constant-load inward migration of T1.
+
+run:
+  epochs: 500
+  burn_in_epochs: 100
+
+arbiter:
+  c2_cell_pool: true
+  regime_load_edges: [0.63, 1.34]   # geometric midpoints of the wider sweep
+  # POOL-CONSERVING TRANSFERS for every mediated method.  Measured without
+  # them: under hard slicing even the oracle (true current slopes) reached
+  # only 0.726 against a 0.924 re-partitioning ceiling, admitting releases
+  # with no matching raise and stranding PRBs (its reservations summed to
+  # 73 of 106).  The arbiter could never move capacity between tenants,
+  # because xApp-sized raise/release pairs rarely match and overflowed the
+  # full pool.  Enabled for ALL mediated methods, so INTACT-RA and
+  # INTACT-RA-Agentic differ only in how they estimate sensitivities.
+  pool_transfers: true
+  # resource pressure rho = demand / capacity of the tenant's RESERVATION,
+  # so rho > 1 means the reservation is binding; that gets its own band
+  regime_pressure_edges: [0.9, 1.1]
+
+# INTACT-RA-Agentic's digital-twin calibration loop (fidelity: see base.yaml
+# agent.twin; affects only methods with the Kalman sensitivity tracker)
+agent:
+  twin:
+    enabled: true
+
+_replace_sections: [tenants, intents, claims, xapps]
+
+tenants:
+  - {tid: T1, omega: 1.0, rho_min: 0.80, envelope: {prb: 48.0}}
+  - {tid: T2, omega: 1.0, rho_min: 0.80, envelope: {prb: 52.0}}
+  - {tid: T3, omega: 1.0, rho_min: 0.80, envelope: {prb: 44.0}}
+  - {tid: HOST, omega: 1.0, rho_min: 0.60, is_host: true, envelope: {}}
+
+intents:
+  - {iid: i1, tenant: T1, kpi: served_ratio, target: 0.95, direction: higher_better,
+     pi_class: 1.0, weight: 1.0, epsilon: 0.02}
+  - {iid: i2, tenant: T1, kpi: delay_p90_ms, target: 100.0, direction: lower_better,
+     pi_class: 1.0, weight: 1.0, epsilon: 0.02}
+  - {iid: i3, tenant: T2, kpi: served_ratio, target: 0.95, direction: higher_better,
+     pi_class: 1.0, weight: 1.0, epsilon: 0.02}
+  - {iid: i4, tenant: T2, kpi: delay_p90_ms, target: 30.0, direction: lower_better,
+     pi_class: 1.0, weight: 1.0, epsilon: 0.02}
+  - {iid: i5, tenant: T3, kpi: served_ratio, target: 0.95, direction: higher_better,
+     pi_class: 1.0, weight: 1.0, epsilon: 0.02}
+  - {iid: i6, tenant: T3, kpi: delay_p90_ms, target: 300.0, direction: lower_better,
+     pi_class: 1.0, weight: 1.0, epsilon: 0.02}
+
+claims:
+  - {jid: j1, xapp: srv_T1, tenant: T1, param: quota_T1,  scope: slice, kind: allocative,
+     domain: [6.0, 40.0], step: 1.0, max_step_frac: 0.20, resource: prb, d_bar: 48.0, r_j: 0.6}
+  - {jid: j2, xapp: lat_T1, tenant: T1, param: quota_T1b, scope: slice, kind: allocative,
+     domain: [4.0, 24.0], step: 1.0, max_step_frac: 0.25, resource: prb, d_bar: 48.0, r_j: 0.6}
+  - {jid: j3, xapp: srv_T2, tenant: T2, param: quota_T2,  scope: slice, kind: allocative,
+     domain: [6.0, 40.0], step: 1.0, max_step_frac: 0.20, resource: prb, d_bar: 52.0, r_j: 0.6}
+  - {jid: j4, xapp: lat_T2, tenant: T2, param: quota_T2b, scope: slice, kind: allocative,
+     domain: [4.0, 28.0], step: 1.0, max_step_frac: 0.25, resource: prb, d_bar: 52.0, r_j: 0.6}
+  - {jid: j5, xapp: srv_T3, tenant: T3, param: quota_T3,  scope: slice, kind: allocative,
+     domain: [6.0, 44.0], step: 1.0, max_step_frac: 0.20, resource: prb, d_bar: 44.0, r_j: 0.6}
+  - {jid: j6, xapp: lat_T3, tenant: T3, param: quota_T3,  scope: slice, kind: allocative,
+     domain: [6.0, 44.0], step: 1.0, max_step_frac: 0.20, resource: prb, d_bar: 44.0, r_j: 0.6}
+
+# Every xApp closes its loop on ITS tenant's intent: push reservation up when
+# the intent is missed, hand it back when comfortably met.
+xapps:
+  - {name: srv_T1, kind: throughput, tenant: T1, param: quota_T1, kpi: served_ratio,
+     domain: [6.0, 40.0], step: 1.0, gain: 25.0, target: 0.95, deadband: 0.02}
+  - {name: lat_T1, kind: latency,    tenant: T1, param: quota_T1b, kpi: delay_p90_ms,
+     domain: [4.0, 24.0], step: 1.0, gain: 0.05, target: 100.0, deadband: 10.0}
+  - {name: srv_T2, kind: throughput, tenant: T2, param: quota_T2, kpi: served_ratio,
+     domain: [6.0, 40.0], step: 1.0, gain: 25.0, target: 0.95, deadband: 0.02}
+  - {name: lat_T2, kind: latency,    tenant: T2, param: quota_T2b, kpi: delay_p90_ms,
+     domain: [4.0, 28.0], step: 1.0, gain: 0.20, target: 30.0, deadband: 3.0}
+  - {name: srv_T3, kind: throughput, tenant: T3, param: quota_T3, kpi: served_ratio,
+     domain: [6.0, 44.0], step: 1.0, gain: 25.0, target: 0.95, deadband: 0.02}
+  - {name: lat_T3, kind: latency,    tenant: T3, param: quota_T3, kpi: delay_p90_ms,
+     domain: [6.0, 44.0], step: 1.0, gain: 0.02, target: 300.0, deadband: 30.0}
+
+ran:
+  # HARD SLICING: fixed, isolating PRB partitions whose unused PRBs are NOT
+  # lent to other slices (allocation: dedicated).  Measured on this scenario
+  # under 'dedicated_shared', B0 scored 0.941 -- above the demand-tracking
+  # ceiling -- by releasing every reservation into the shared, slot-by-slot
+  # work-conserving pool: with out-of-phase loads whose combined need fits
+  # the pool, statistical multiplexing makes "release everything" optimal
+  # and arbitration pointless.  Under hard slicing, re-partitioning capacity
+  # is the operator's only lever, and a release that is not reassigned
+  # strands PRBs.  The floor and ceiling references never leave capacity
+  # unreserved (both hold exactly 106 of 106), so their calibration
+  # (0.724 / 0.924, gap +0.201, 3 seeds) is identical under either model.
+  allocation: dedicated
+  envelopes:
+    T1: {prb: 48.0}
+    T2: {prb: 52.0}
+    T3: {prb: 44.0}
+  initial_controls:
+    txpower: 40.0
+    tilt: 8.0
+    quota_T1: 32.0            # T1 provisioned for the EDGE with headroom: 32 + 14 = 46
+    quota_T1b: 14.0
+    quota_T2: 20.0            # T2 at its AVERAGE need: 20 + 10 = 30
+    quota_T2b: 10.0
+    quota_T3: 30.0            # T3 below its overload need; total 106 of 106
+  slices:
+    T1:
+      load_mbps_per_ue: 0.7
+      placement: {radius_min_m: 250.0, radius_max_m: 310.0}
+      load_profile: {levels: [1.0], hold_slots: 1000000, phase: 0}
+    T2:
+      load_mbps_per_ue: 2.0
+      load_profile: {levels: [2.00, 0.30], hold_slots: 700, ramp_slots: 80, phase: 0}
+    T3:
+      load_mbps_per_ue: 0.65
+      load_profile: {levels: [0.30, 2.00], hold_slots: 700, ramp_slots: 80, phase: 0}
+  mobility:
+    mode: group_drift
+    drift:
+      tenants: [T1]
+      rate_m_per_slot: -0.028     # inward: ~275 m -> ~100 m
+      start_slot: 1600
+      jitter_m_per_slot: 0.10
+    wander_radius_m: 35.0
+
+gates:
+  oracle_gain_min: 0.030
+  control_gain_min: 0.030
+  conflict_gain_min: 0.030
+  agentic_gain_min: 0.010
+
+calibration:
+  sweep_load_scales: [0.40, 1.00, 1.80]

@@ -1,0 +1,171 @@
+# Oracle-first diagnostic: findings
+
+This document records what the oracle diagnostic established, in the order
+it was established, including the hypotheses that were tested and
+rejected. It is deliberately written so that a reader can see which
+conclusions rest on measurement and which remain open.
+
+## Headline
+
+**The headline claim (INTACT-RA-Agentic > INTACT-RA) is NOT supported, and
+the reason is a property of the simulator, not of the estimator.**
+
+Two scenarios were tested with a ground-truth oracle. Neither supports the
+claim, and they fail for opposite reasons. No amount of agent tuning can
+fix either, which is why no agent tuning was done after the diagnostic
+returned.
+
+---
+
+## 1. The oracle diagnostic on S1 -> Case A
+
+Oracle = the identical arbiter reading true local slopes, measured every 5
+epochs by paired finite differences on a cloned RAN with common random
+numbers (`clone()` preserves RNG state, so the pairing is genuine).
+
+400 epochs, 2 seeds:
+
+| method | wIF | crossings | writes/ep |
+|---|---|---|---|
+| **B3 (real)** | **0.7491** | 55.0 | 0.64 |
+| Oracle (true current slopes) | 0.6267 | 45.0 | 0.32 |
+| INTACT-RA (frozen table) | 0.6221 | 21.5 | 0.16 |
+| all-reject | 0.5921 | 0.0 | 0.00 |
+| INTACT-RA-Agentic | 0.5694 | 11.0 | 0.12 |
+| all-accept | 0.4058 | 173.0 | 1.74 |
+
+**Oracle - INTACT-RA = +0.0046.** Perfect knowledge of the current
+sensitivities is worth essentially nothing over a frozen table.
+
+## 2. Why: PRB allocation was a free lunch
+
+Measured directly. `+8 PRB` to T1's quota, holding everything else fixed:
+
+| load | PRB util | dT1 | dT2 | dT3 | **NET** |
+|---|---|---|---|---|---|
+| base (S1) | 68.4% | +0.435 | +0.653 | +0.079 | **+1.167** |
+| +30% | 80.8% | +0.280 | +0.108 | +0.067 | **+0.455** |
+| +60% | 98.5% | -0.244 | +0.500 | -0.006 | **+0.250** |
+| +100% | 100.0% | -0.296 | +0.369 | -0.063 | **+0.011** |
+
+At the S1 operating point every tenant gains from one tenant's quota
+increase, and T2 gains more than T1 does. Allocation is
+`min(share * quota, demand)`, so with spare capacity an unused quota costs
+nobody anything and the dominant policy is "raise everything".
+
+This is the same failure mode already recorded in this project's notes.
+It had returned without being noticed because the headline metric was
+never checked against write rate:
+
+| writes/ep | 0.00 | 0.12 | 0.16 | 0.32 | 0.64 | 1.20 | 1.25 | 1.74 |
+|---|---|---|---|---|---|---|---|---|
+| wIF | 0.592 | 0.569 | 0.622 | 0.627 | **0.749** | 0.581 | 0.674 | 0.406 |
+
+An inverted U peaking near 0.6 writes/epoch. **Write rate explains more
+variance in wIF than slope quality does.** That is sufficient on its own
+to explain every failed tuning attempt across both sessions.
+
+## 3. The scrambled-table control
+
+A control that keeps the offline table's distribution of slope magnitudes
+and standard errors but permutes which (parameter, intent) pair each value
+belongs to: perfectly calibrated aggregate beliefs, zero specific
+knowledge.
+
+| table read by the B3 rule | wIF | crossings | writes/ep |
+|---|---|---|---|
+| frozen offline table | 0.7491 | 55.0 | 0.64 |
+| **true (oracle) slopes** | 0.6739 | 127.0 | 1.25 |
+| **scrambled slopes** | 0.5810 | 144.0 | 1.20 |
+
+True minus scrambled = **+0.093 at matched write rate** (1.25 vs 1.20).
+So slope knowledge is worth something. But it is smaller than the swing
+that write rate alone produces, and both oracle and scrambled overshoot
+the 0.64 optimum, which is why they both score below the frozen table.
+
+## 4. S6: saturating the pool fixes the free lunch and breaks something else
+
+S6 raises offered load until the pool binds (utilisation p50 97.5%), so
+allocation is zero-sum and the choice of write must matter.
+
+| method | wIF | crossings | writes/ep |
+|---|---|---|---|
+| **all-reject** | **0.5570** | 0.0 | 0.00 |
+| b3 | 0.4822 | 19.0 | 0.45 |
+| intact-ra-agentic | 0.4679 | 6.5 | 0.10 |
+| Oracle | 0.4524 | 67.5 | 0.65 |
+| intact-ra | 0.4149 | 93.5 | 0.66 |
+| all-accept | 0.3753 | 106.5 | 1.68 |
+
+**The oracle loses to doing nothing by 0.105.** With perfect slopes the
+arbiter still cannot beat all-reject, so this is not an estimation problem
+either. It independently reproduces the result recorded in the engineering
+handoff for its own corridor scenario (oracle 0.398 < all-reject 0.455).
+
+S6 also has a second defect: at this load T1's median delay is 1488 ms
+against a 1500 ms reporting clip and T2's is 2.2 ms against a 2.0 ms
+processing floor, so two of the seven intents are degenerate.
+
+## 5. The operating window
+
+The two scenarios bracket the regime that is actually needed:
+
+- **68% utilisation** -> every write is a free lunch, write COUNT dominates
+  choice, sensitivity knowledge is nearly worthless.
+- **97% utilisation** -> the pool binds, but the plant is so constrained
+  that actuation is net-harmful and all-reject wins.
+
+A scenario that can support the headline claim has to sit between these,
+and neither S1 nor S6 does. Finding that window is the next task, and it
+should be driven by the zero-sum probe (`scripts/probe_zerosum.py`) rather
+than by trying controller configurations.
+
+## 6. Hypotheses tested and REJECTED
+
+**Threshold-aligned objective.** The arbiter maximises `sum_i w_i * dg_i`,
+a linear sum, while wIF counts `1[g >= 0]`, a threshold. Rescuing an
+intent from -0.01 to +0.49 scores identically to moving a comfortable one
+from +0.50 to +1.00. This looked like a clean explanation, and the
+handoff's independent observation (zeroing `action_cost` raised writes
+0.08 -> 0.22 without raising wIF) was consistent with it.
+
+It was implemented as `arbiter.objective: threshold`, scoring the expected
+change in fulfilment with `P(g>=0) = Phi(g_hat/sigma)` plus a linear
+tie-break, and applied identically to every method.
+
+It made things worse at every probit width tried:
+
+| objective | probit width | INTACT-RA wIF | crossings |
+|---|---|---|---|
+| linear | - | 0.6221 | 21.5 |
+| threshold | 0.03 | 0.3728 | 209.0 |
+| threshold | 0.10 | 0.5114 | 133.0 |
+| threshold | 0.12 | 0.5174 | 130.5 |
+| threshold | 0.25 | 0.6026 | 26.5 |
+
+At narrow widths it chases threshold flips far inside its own noise
+(measured prediction error is ~0.14). The code is retained behind a config
+flag because it is a reasonable idea that deserves to be re-tested in a
+non-degenerate plant, but **`linear` remains the default** and the
+hypothesis is recorded as rejected on the present evidence.
+
+## 7. Handoff claims: verified, corrected, refuted
+
+| claim | status |
+|---|---|
+| "B3" in the delivered package was not the codebase's B3 | **Confirmed.** It compared against static-priority. The real B3 (unweighted signed margin, no robust bound, no risk term, no action cost) is now implemented and scores 0.7491 on S1, beating INTACT-RA by +0.127. |
+| factor-of-ten dose-scaling bug on scheduler weights | **Confirmed, and larger than reported.** RLS fits on scaled doses `x = d * s` but `candidate()` returned theta unscaled AND the prior was seeded in unscaled units, so `schedw` slopes were published 10x too small and the ridge pull dragged toward a wrongly scaled prior. Fixed; unit round-trip verified (0.30 -> 0.30, previously 0.030). |
+| RLS covariance became indefinite | **Latent defect confirmed.** The Riccati update had no symmetrisation and forgetting (lam < 1) compounds asymmetry every step; a negative diagonal yields NaN sigma, which silently disables the robust safety bound rather than raising. Symmetrisation plus eigenvalue projection added, with an `n_psd_repairs` counter. |
+| non-picklable rolling-baseline object broke resumability | **Refuted for this codebase.** State pickles cleanly and the self-test already asserts bit-identical checkpoint resume. That defect was introduced by the other session's own changes. |
+| oracle ceiling below all-reject on their corridor | **Independently reproduced on S6** (0.4524 vs 0.5570). |
+
+## 8. What is NOT established
+
+- No scenario yet supports Oracle > frozen INTACT-RA by a meaningful
+  margin, so the primary gate fails and the headline claim is
+  **unsupported**, not merely unproven.
+- The agentic controller has not been improved this session, deliberately:
+  the Case A diagnostic says improving it would manufacture a gain.
+- S2, S3 and S4 have not been run through the oracle diagnostic.
+- Held-out seeds have not been touched. Everything above is development
+  evidence on seeds 20260925 and 20260926.

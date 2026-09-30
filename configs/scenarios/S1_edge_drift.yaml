@@ -1,0 +1,63 @@
+# ===========================================================================
+# S1 -- Edge drift at constant offered load  (the headline scenario)
+# ===========================================================================
+# T1's user population migrates radially outward from a mean radius of
+# ~163 m to the cell boundary, at a CONSTANT offered load.  Nothing in the
+# traffic changes, so the per-tenant measured load label that indexes
+# INTACT-RA's sensitivity table does not move.  The physics underneath it
+# moves a great deal:
+#
+#   * d(g_i1)/d(tilt)  goes from +0.0297 near-in to -0.0157 at the boundary
+#   * d(g_i2)/d(tilt)  goes from +0.0008 near-in to -0.1944 at the boundary
+#
+# Both flip SIGN.  This is not a scripted step change: it is the 3GPP
+# TR 38.901 three-dimensional antenna pattern.  Electrical downtilt aims
+# the main lobe at a ground radius; users inside that radius gain from
+# more downtilt and users beyond it lose.  T1 simply walks across the
+# beam peak.
+#
+# The consequence is the sharpest possible version of table staleness.
+# A frozen table does not merely become imprecise -- it recommends the
+# OPPOSITE action, confidently, with a small calibrated standard error.
+#
+# The offline sweep is run with mobility disabled at the SPAWN placement,
+# which is what an offline calibration in a lab or digital twin can
+# actually do.  So the table is measured in the near field and applied in
+# the far field, and the failure is structural rather than an oversight.
+
+_scenario_note: >
+  Constant-load outward migration of T1 across the antenna beam peak.
+  Tests whether a controller notices that a calibrated coefficient has
+  changed sign when the label it is indexed by has not moved at all.
+
+run:
+  epochs: 800
+
+ran:
+  # The electrical downtilt aims the main lobe at a ground radius of
+  # h_bs / tan(theta).  At the base 6 degrees that is 238 m, which T1 only
+  # reaches near the end of the run.  At 8 degrees it is 178 m, just
+  # outside T1's spawn radius, so the population crosses the beam peak
+  # early and spends most of the run on the far side of it.  Nothing about
+  # the geometry at SPAWN changes, so the offline sweep still measures the
+  # near-field (positive) slope with its usual small standard error -- the
+  # table is calibrated correctly and then invalidated by the migration.
+  initial_controls:
+    tilt: 8.0
+  mobility:
+    mode: group_drift
+    drift:
+      tenants: [T1]
+      rate_m_per_slot: 0.0140     # ~1.4 m/s radial: 163 m -> ~300 m,
+                                  # crossing the 178 m beam peak by epoch ~90
+                                  # egress, sustained over ~2 minutes
+      start_slot: 400             # epochs 0-24 are stationary, so the
+                                  # frozen table starts out CORRECT and
+                                  # the time series shows it going stale
+      jitter_m_per_slot: 0.10
+    wander_radius_m: 35.0
+
+gates:
+  drift_materiality_min: 2.0
+  control_gain_min: 0.030
+  conflict_gain_min: 0.030

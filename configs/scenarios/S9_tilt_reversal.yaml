@@ -1,0 +1,141 @@
+# ===========================================================================
+# S9 -- Tilt reversal: the dominant contested decision changes sign
+# ===========================================================================
+# DESIGN PRINCIPLE (from the S8 measurements)
+# -------------------------------------------
+# On S8, a precise current-slope oracle changed INTACT-RA's decision 64.5%
+# of the time, yet a rollout oracle choosing among the same candidates by
+# simulation only TIED frozen INTACT-RA.  An argmax over candidate
+# portfolios is insensitive to errors in slope MAGNITUDE; only changes in
+# the RANKING of candidates matter.  S8's dominant decisions were quota
+# contests whose slopes drift in magnitude but keep their sign, so a stale
+# table still ranked them roughly right.
+#
+# The one sensitivity that genuinely REVERSES under migration is antenna
+# tilt.  In S8 it was a small share of decisions and its prior slope was
+# near zero, because T1 spawned almost at the beam peak.  S9 makes the
+# reversing decision the dominant one.
+#
+# PHYSICAL MECHANISM
+# ------------------
+# Electrical downtilt aims the main lobe at ground radius h_bs/tan(theta);
+# at 8 degrees and 25 m that is 178 m.  Users INSIDE that radius gain from
+# more downtilt; users BEYOND it lose.  T1 spawns at 80-140 m, well inside,
+# so the offline sweep -- run with mobility disabled at the spawn placement,
+# which is what an offline calibration can actually do -- measures a
+# strongly positive d(g_T1)/d(tilt) with a small standard error.  T1 then
+# migrates at CONSTANT offered load to ~300 m, beyond the peak, where the
+# true slope is negative.  Its load label never moves, so INTACT-RA's
+# frozen table keeps confidently recommending the near-field direction.
+#
+# THE CONFLICT
+# ------------
+# tilt_edge pulls tilt UP (toward 5 deg, widening coverage to the edge);
+# tilt_core pulls it DOWN (toward 11 deg, concentrating power near-in).
+# Both write the same cell-scope knob every epoch, so the arbiter must pick
+# a direction.  Before migration tilt_core is right for T1; after it,
+# tilt_edge is.  Their setpoints are the experimental design and are marked
+# fixed_setpoint so calibration does not remove the conflict.
+#
+# The quota contest from S8 (normalised dedicated reservations, out-of-phase
+# T1/T2 load) is retained, because it is what distinguishes INTACT-RA from
+# B3.  Scheduler-weight and MCS claims are removed: they were ratchet-prone
+# and diluted the decision under test.
+#
+# ACCEPTANCE -- evaluated with the rollout oracle BEFORE any agent tuning
+#   Oracle-R - frozen INTACT-RA >= 0.030 IF
+
+_scenario_note: >
+  Constant-load migration of T1 from well inside to well beyond the antenna
+  beam peak, with a two-sided tilt conflict as the dominant decision, on
+  top of a normalised-dedicated-reservation quota contest.
+
+run:
+  epochs: 400
+
+_replace_sections: [intents, xapps, claims]
+
+claims:
+  - {jid: j1, xapp: energy,    tenant: HOST, param: txpower, scope: cell,
+     kind: regulative, domain: [32.0, 46.0], step: 0.5, max_step_frac: 0.20, r_j: 0.40}
+  - {jid: j2, xapp: coverage,  tenant: HOST, param: txpower, scope: cell,
+     kind: regulative, domain: [32.0, 46.0], step: 0.5, max_step_frac: 0.20, r_j: 0.55}
+  - {jid: j3, xapp: tilt_edge, tenant: HOST, param: tilt, scope: cell,
+     kind: regulative, domain: [2.0, 12.0], step: 0.5, max_step_frac: 0.25, r_j: 0.50}
+  - {jid: j10, xapp: tilt_core, tenant: HOST, param: tilt, scope: cell,
+     kind: regulative, domain: [2.0, 12.0], step: 0.5, max_step_frac: 0.25, r_j: 0.50}
+  - {jid: j4, xapp: tput_T1,   tenant: T1, param: quota_T1, scope: slice,
+     kind: allocative, domain: [10.0, 58.0], step: 1.0, max_step_frac: 0.15,
+     resource: prb, d_bar: 58.0, r_j: 0.70}
+  - {jid: j5, xapp: lat_T2,    tenant: T2, param: quota_T2, scope: slice,
+     kind: allocative, domain: [10.0, 54.0], step: 1.0, max_step_frac: 0.15,
+     resource: prb, d_bar: 54.0, r_j: 0.65}
+  - {jid: j6, xapp: rob_T3,    tenant: T3, param: quota_T3, scope: slice,
+     kind: allocative, domain: [6.0, 40.0], step: 1.0, max_step_frac: 0.15,
+     resource: prb, d_bar: 40.0, r_j: 0.45}
+
+xapps:
+  - {name: energy,    kind: energy,     tenant: HOST, param: txpower,
+     domain: [32.0, 46.0], step: 0.5, gain: 0.45, target: 36.5}
+  - {name: coverage,  kind: coverage,   tenant: HOST, param: txpower,
+     domain: [32.0, 46.0], step: 0.5, gain: 0.55, edge_trigger: 0.5, sinr_target: 17.0}
+  - {name: tilt_edge, kind: energy,     tenant: HOST, param: tilt,
+     domain: [2.0, 12.0], step: 0.5, gain: 0.5, target: 5.0, fixed_setpoint: true}
+  - {name: tilt_core, kind: energy,     tenant: HOST, param: tilt,
+     domain: [2.0, 12.0], step: 0.5, gain: 0.5, target: 11.0, fixed_setpoint: true}
+  - {name: tput_T1,   kind: throughput, tenant: T1, param: quota_T1,
+     domain: [10.0, 58.0], step: 1.0, gain: 2.4, target: 1.5, deadband: 0.10}
+  - {name: lat_T2,    kind: latency,    tenant: T2, param: quota_T2,
+     domain: [10.0, 54.0], step: 1.0, gain: 0.5, target: 5.0, deadband: 0.5}
+  - {name: rob_T3,    kind: throughput, tenant: T3, param: quota_T3,
+     domain: [6.0, 40.0], step: 1.0, gain: 3.0, target: 0.7, deadband: 0.05}
+
+ran:
+  allocation: dedicated
+  initial_controls:
+    tilt: 8.0
+    quota_T1: 46.0
+    quota_T2: 42.0
+    quota_T3: 30.0
+  slices:
+    T1:
+      placement: {radius_min_m: 80.0, radius_max_m: 140.0}
+      load_profile: {levels: [0.60, 1.60], hold_slots: 700, ramp_slots: 100, phase: 0}
+    T2:
+      load_profile: {levels: [1.60, 0.60], hold_slots: 700, ramp_slots: 100, phase: 0}
+    T3:
+      load_profile: {levels: [1.0], hold_slots: 1000000, phase: 0}
+  mobility:
+    mode: group_drift
+    drift:
+      tenants: [T1]
+      rate_m_per_slot: 0.028      # ~2.8 m/s radial: 110 m -> ~300 m
+      start_slot: 200
+      jitter_m_per_slot: 0.10
+    wander_radius_m: 35.0
+
+gates:
+  oracle_gain_min: 0.030
+  knowledge_gain_min: 0.050
+  control_gain_min: 0.030
+  conflict_gain_min: 0.030
+  agentic_gain_min: 0.010
+
+# >>> CALIBRATED -- written by scripts/calibrate_targets.py; do not edit by hand
+intents:
+  - {iid: i1, tenant: T1, kpi: throughput_mbps, target: 1.606, direction: higher_better, pi_class: 1.0, weight: 1.0, epsilon: 0.02}
+  - {iid: i2, tenant: T1, kpi: delay_p50_ms, target: 2.00, direction: lower_better, pi_class: 1.0, weight: 1.0, epsilon: 0.02}
+  - {iid: i3, tenant: T2, kpi: throughput_mbps, target: 1.944, direction: higher_better, pi_class: 1.0, weight: 1.0, epsilon: 0.02}
+  - {iid: i4, tenant: T2, kpi: delay_p90_ms, target: 2.97, direction: lower_better, pi_class: 1.0, weight: 1.0, epsilon: 0.02}   # delay_p90_ms: delay_p50 IQR degenerate here
+  - {iid: i5, tenant: T3, kpi: throughput_mbps, target: 0.661, direction: higher_better, pi_class: 1.0, weight: 1.0, epsilon: 0.02}
+  - {iid: i6, tenant: T3, kpi: delay_p90_ms, target: 2.99, direction: lower_better, pi_class: 1.0, weight: 1.0, epsilon: 0.02}   # delay_p90_ms: delay_p50 IQR degenerate here
+  - {iid: i7, tenant: HOST, kpi: txpower_dbm, target: 40.0, direction: lower_better, pi_class: 1.0, weight: 1.0, epsilon: 0.0}
+xapps:
+  - {name: energy, kind: energy, tenant: HOST, param: txpower, domain: [32.0, 46.0], step: 0.5, gain: 0.45, target: 36.5}
+  - {name: coverage, kind: coverage, tenant: HOST, param: txpower, domain: [32.0, 46.0], step: 0.5, gain: 0.55, edge_trigger: 0.548, sinr_target: 18.31}
+  - {name: tilt_edge, kind: energy, tenant: HOST, param: tilt, domain: [2.0, 12.0], step: 0.5, gain: 0.5, target: 5.0, fixed_setpoint: True}
+  - {name: tilt_core, kind: energy, tenant: HOST, param: tilt, domain: [2.0, 12.0], step: 0.5, gain: 0.5, target: 11.0, fixed_setpoint: True}
+  - {name: tput_T1, kind: throughput, tenant: T1, param: quota_T1, domain: [10.0, 58.0], step: 1.0, gain: 2.4, target: 1.606, deadband: 0.1}
+  - {name: lat_T2, kind: latency, tenant: T2, param: quota_T2, domain: [10.0, 54.0], step: 1.0, gain: 1.504, target: 2.66, deadband: 0.5}
+  - {name: rob_T3, kind: throughput, tenant: T3, param: quota_T3, domain: [6.0, 40.0], step: 1.0, gain: 3.0, target: 0.661, deadband: 0.1}
+# <<< CALIBRATED

@@ -1,0 +1,149 @@
+# ===========================================================================
+# S3 -- A tenant arrives mid-run
+# ===========================================================================
+# T4 does not exist at epoch 0.  It arrives at epoch 300 with its own
+# slice, its own UEs, its own intents and its own claim on the shared PRB
+# pool.  Nothing in the offline table has ever seen it.
+#
+# This is where "missing entry means slope zero" stops being a modelling
+# convenience and becomes a safety hazard.  A table that returns 0.0 for
+# an unknown coefficient is asserting that the new tenant's knob affects
+# nobody, which is exactly wrong: T4 is drawing from the same pool as
+# everyone else.  INTACT-RA's StaticSensitivity does return 0.0 with
+# sigma 0.0 for a missing entry, and that is the documented failure mode
+# this scenario is built to expose.
+#
+# The agentic method instead reports sigma = unknown_sigma, the robust
+# bound refuses the action, and the supervisor schedules a bounded
+# calibration probe. The measurable quantity is ADAPTATION DELAY: how
+# many epochs until prediction error returns to its pre-arrival level.
+
+_scenario_note: >
+  Tenant T4 arrives at epoch 300 with no calibrated table entries.
+  Exercises unknown-entry handling, supervisor probing and adaptation
+  delay rather than slope drift.
+
+run:
+  epochs: 800
+
+_replace_sections: [tenants, intents, claims, xapps]
+
+ran:
+  mobility:
+    mode: group_drift
+    drift:
+      tenants: [T1]
+      rate_m_per_slot: 0.0090
+      start_slot: 400
+      jitter_m_per_slot: 0.10
+  initial_controls:
+    txpower: 40.0
+    tilt: 8.0
+    quota_T1: 38.0
+    quota_T2: 34.0
+    quota_T3: 22.0
+    quota_T4: 14.0
+    schedw_T1: 1.0
+    schedw_T2: 1.0
+    mcs_T3: 20.0
+  envelopes:
+    T1: {prb: 58.0}
+    T2: {prb: 54.0}
+    T3: {prb: 40.0}
+    T4: {prb: 32.0}
+  slices:
+    T4:
+      n_ue: 8
+      load_mbps_per_ue: 1.60
+      load_spread: 0.25
+      arrives_at_epoch: 300
+      qos_throughput_mbps: 1.2
+      qos_delay_ms: 35.0
+      qos_bler: 0.10
+      placement:
+        radius_min_m: 60.0
+        radius_max_m: 170.0
+        angle_min_deg: 200.0
+        angle_max_deg: 340.0
+        speed_mps_min: 0.3
+        speed_mps_max: 1.4
+      load_profile: {levels: [1.0], hold_slots: 100000, phase: 0}
+      initial_controls: {quota_T4: 14.0}
+
+tenants:
+  - {tid: T1, omega: 1.0,  rho_min: 0.80, envelope: {prb: 58.0}}
+  - {tid: T2, omega: 0.95, rho_min: 0.80, envelope: {prb: 54.0}}
+  - {tid: T3, omega: 0.70, rho_min: 0.75, envelope: {prb: 40.0}}
+  - {tid: T4, omega: 0.90, rho_min: 0.80, envelope: {prb: 32.0},
+     arrives_at_epoch: 300}
+  - {tid: HOST, omega: 0.60, rho_min: 0.60, is_host: true, envelope: {}}
+
+intents:
+  - {iid: i1, tenant: T1, kpi: throughput_mbps, target: 1.70, direction: higher_better,
+     pi_class: 1.00, weight: 1.0, epsilon: 0.02}
+  - {iid: i2, tenant: T1, kpi: delay_p50_ms,    target: 115.0, direction: lower_better,
+     pi_class: 0.75, weight: 1.0, epsilon: 0.02}
+  - {iid: i3, tenant: T2, kpi: delay_p50_ms,    target: 7.5, direction: lower_better,
+     pi_class: 1.00, weight: 1.0, epsilon: 0.02}
+  - {iid: i4, tenant: T2, kpi: throughput_mbps, target: 1.72, direction: higher_better,
+     pi_class: 0.85, weight: 1.0, epsilon: 0.02}
+  - {iid: i5, tenant: T3, kpi: throughput_mbps, target: 0.57, direction: higher_better,
+     pi_class: 0.70, weight: 1.0, epsilon: 0.02}
+  - {iid: i7, tenant: T3, kpi: delay_p50_ms,    target: 167.0, direction: lower_better,
+     pi_class: 0.55, weight: 1.0, epsilon: 0.02}
+  - {iid: i6, tenant: HOST, kpi: txpower_dbm,   target: 40.0, direction: lower_better,
+     pi_class: 0.60, weight: 1.0, epsilon: 0.0}
+  - {iid: i8, tenant: T4, kpi: throughput_mbps, target: 1.30, direction: higher_better,
+     pi_class: 0.95, weight: 1.0, epsilon: 0.02, arrives_at_epoch: 300}
+
+claims:
+  - {jid: j1, xapp: energy,    tenant: HOST, param: txpower, scope: cell,
+     kind: regulative, domain: [32.0, 46.0], step: 0.5, max_step_frac: 0.20, r_j: 0.40}
+  - {jid: j2, xapp: coverage,  tenant: HOST, param: txpower, scope: cell,
+     kind: regulative, domain: [32.0, 46.0], step: 0.5, max_step_frac: 0.20, r_j: 0.55}
+  - {jid: j3, xapp: tiltctl,   tenant: HOST, param: tilt, scope: cell,
+     kind: regulative, domain: [2.0, 12.0], step: 0.5, max_step_frac: 0.25, r_j: 0.35}
+  - {jid: j4, xapp: tput_T1,   tenant: T1, param: quota_T1, scope: slice,
+     kind: allocative, domain: [10.0, 58.0], step: 1.0, max_step_frac: 0.15,
+     resource: prb, d_bar: 58.0, r_j: 0.70}
+  - {jid: j5, xapp: lat_T2,    tenant: T2, param: quota_T2, scope: slice,
+     kind: allocative, domain: [10.0, 54.0], step: 1.0, max_step_frac: 0.15,
+     resource: prb, d_bar: 54.0, r_j: 0.65}
+  - {jid: j6, xapp: rob_T3,    tenant: T3, param: quota_T3, scope: slice,
+     kind: allocative, domain: [6.0, 40.0], step: 1.0, max_step_frac: 0.15,
+     resource: prb, d_bar: 40.0, r_j: 0.45}
+  - {jid: j7, xapp: steer_T1,  tenant: T1, param: schedw_T1, scope: slice,
+     kind: allocative, domain: [0.5, 2.0], step: 0.05, max_step_frac: 0.25, r_j: 0.50}
+  - {jid: j8, xapp: steer_T2,  tenant: T2, param: schedw_T2, scope: slice,
+     kind: allocative, domain: [0.5, 2.0], step: 0.05, max_step_frac: 0.25, r_j: 0.50}
+  - {jid: j9, xapp: mcs_T3,    tenant: T3, param: mcs_T3, scope: slice,
+     kind: regulative, domain: [8.0, 27.0], step: 1.0, max_step_frac: 0.25, r_j: 0.30}
+  - {jid: j10, xapp: tput_T4,  tenant: T4, param: quota_T4, scope: slice,
+     kind: allocative, domain: [6.0, 32.0], step: 1.0, max_step_frac: 0.15,
+     resource: prb, d_bar: 32.0, r_j: 0.75, arrives_at_epoch: 300}
+
+xapps:
+  - {name: energy,   kind: energy,     tenant: HOST, param: txpower,
+     domain: [32.0, 46.0], step: 0.5, gain: 0.45, target: 36.5}
+  - {name: coverage, kind: coverage,   tenant: HOST, param: txpower,
+     domain: [32.0, 46.0], step: 0.5, gain: 0.55, edge_trigger: 0.22, sinr_target: 7.5}
+  - {name: tiltctl,  kind: energy,     tenant: HOST, param: tilt,
+     domain: [2.0, 12.0], step: 0.5, gain: 0.5, target: 9.0, target_alt: 7.0, period: 40}
+  - {name: tput_T1,  kind: throughput, tenant: T1, param: quota_T1,
+     domain: [10.0, 58.0], step: 1.0, gain: 2.4, target: 3.55, deadband: 0.12}
+  - {name: lat_T2,   kind: latency,    tenant: T2, param: quota_T2,
+     domain: [10.0, 54.0], step: 1.0, gain: 0.55, target: 23.0, deadband: 1.5}
+  - {name: rob_T3,   kind: throughput, tenant: T3, param: quota_T3,
+     domain: [6.0, 40.0], step: 1.0, gain: 3.0, target: 1.02, deadband: 0.05}
+  - {name: steer_T1, kind: steering,   tenant: T1, param: schedw_T1,
+     domain: [0.5, 2.0], step: 0.05, gain: 0.55, target: 74.0, deadband: 6.0}
+  - {name: steer_T2, kind: steering,   tenant: T2, param: schedw_T2,
+     domain: [0.5, 2.0], step: 0.05, gain: -0.45, target: 74.0, deadband: 6.0}
+  - {name: mcs_T3,   kind: robustness, tenant: T3, param: mcs_T3,
+     domain: [8.0, 27.0], step: 1.0, gain: 0.55, target: 26.0}
+  - {name: tput_T4,  kind: throughput, tenant: T4, param: quota_T4,
+     domain: [6.0, 32.0], step: 1.0, gain: 2.2, target: 1.55, deadband: 0.12}
+
+gates:
+  drift_materiality_min: 1.6
+  agentic_gain_min: 0.010

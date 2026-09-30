@@ -1,0 +1,141 @@
+# ===========================================================================
+# S7 -- Contested cell: heterogeneous tenants, out-of-phase load, edge drift
+# ===========================================================================
+# THE SCOPE OF THE HEADLINE CLAIM.  Every condition below is a physical
+# precondition for sensitivity knowledge to have decision value, derived
+# from a measured diagnostic, and each maps to exactly one rung of the
+# comparison ladder.  The conditions are declared BEFORE any controller is
+# evaluated, and the oracle must independently clear its gate on this
+# scenario before the learned controller is scored at all.
+#
+# 1. WORK-CONSERVING WEIGHTED SHARING (ran.allocation: shares)
+#    Quotas are weights over the whole PRB pool, not hard caps.  Measured
+#    with a paired counterfactual probe: under the legacy cap model, +8 PRB
+#    to T1 gave dT1 +0.125 and exactly 0.000 to everyone else -- a free
+#    lunch, so "raise everything" dominates and no slope can matter.  Under
+#    shares at 1.6x load the same write gives dT1 +0.106, dT3 -0.086:
+#    genuinely zero-sum.  Precondition for ANY rung of the ladder.
+#
+# 2. LOAD HIGH ENOUGH THAT THE POOL BINDS, NOT SO HIGH THAT IT CHOKES
+#    At 1.0x under shares nobody is backlogged and every quota write is
+#    inert; at the S6 load the plant is so constrained that all-reject
+#    beats the oracle.  1.6x sits between.   -> all-reject must LOSE.
+#
+# 3. OUT-OF-PHASE PER-TENANT LOAD   (B3  ->  INTACT-RA)
+#    Under weighted sharing a tenant's quota slope is large while it is
+#    backlogged and close to zero while it is not.  T1 and T2 alternate,
+#    so at any moment one is overloaded and one is not, while the CELL
+#    average barely moves.  B3 reads one cell-wide column of slopes for
+#    everyone; INTACT-RA reads each tenant's own.  This is the mechanism by
+#    which INTACT-RA beat B3 in the original experiments.
+#
+# 4. OUTWARD MIGRATION AT CONSTANT LOAD   (INTACT-RA  ->  Agentic)
+#    T1 walks from ~163 m across the antenna beam peak (h_bs/tan 8deg =
+#    178 m) toward the cell edge.  Its spectral efficiency falls, so every
+#    PRB is worth less to it, and d(g)/d(tilt) reverses sign.  T1's offered
+#    LOAD does not change, so the per-tenant load label that indexes
+#    INTACT-RA's frozen table does not move either.  The frozen table keeps
+#    recommending the near-field action; only a current estimate notices.
+#
+# 5. MODERATE ACTUATION COST
+#    Reconfiguration transients make indiscriminate writing expensive.
+#                                                   -> all-accept must LOSE.
+
+_scenario_note: >
+  Contested cell with work-conserving weighted PRB sharing, out-of-phase
+  per-tenant load and constant-load outward migration of T1 across the
+  antenna beam peak. Each mechanism corresponds to one rung of the
+  B3 < INTACT-RA < INTACT-RA-Agentic <= Oracle ladder.
+
+run:
+  epochs: 800
+
+# Targets at the MEASURED MEDIAN of the passive S7 plant (2 seeds x 800
+# epochs), so each intent sits near 50% fulfilment under no control and a
+# controller can move it either way.  T2's median delay is pinned at the
+# 2.0 ms processing floor across its entire interquartile range, which
+# would make a median-delay intent degenerate; its p90 delay (IQR
+# 3.4-224 ms) is used instead.
+_replace_sections: [intents, xapps]
+intents:
+  - {iid: i1, tenant: T1, kpi: throughput_mbps, target: 2.199, direction: higher_better,
+     pi_class: 1.0, weight: 1.0, epsilon: 0.02}
+  - {iid: i2, tenant: T1, kpi: delay_p50_ms,    target: 305.0, direction: lower_better,
+     pi_class: 1.0, weight: 1.0, epsilon: 0.02}
+  - {iid: i3, tenant: T2, kpi: delay_p90_ms,    target: 44.6, direction: lower_better,
+     pi_class: 1.0, weight: 1.0, epsilon: 0.02}
+  - {iid: i4, tenant: T2, kpi: throughput_mbps, target: 2.81, direction: higher_better,
+     pi_class: 1.0, weight: 1.0, epsilon: 0.02}
+  - {iid: i5, tenant: T3, kpi: throughput_mbps, target: 0.991, direction: higher_better,
+     pi_class: 1.0, weight: 1.0, epsilon: 0.02}
+  - {iid: i7, tenant: T3, kpi: delay_p50_ms,    target: 3.84, direction: lower_better,
+     pi_class: 1.0, weight: 1.0, epsilon: 0.02}
+  - {iid: i6, tenant: HOST, kpi: txpower_dbm,   target: 40.0, direction: lower_better,
+     pi_class: 1.0, weight: 1.0, epsilon: 0.0}
+
+# xApp SETPOINTS, calibrated at the S7 passive-plant median exactly as the
+# intent targets are.  This is not a tuning choice; it is what makes the
+# xApps closed-loop controllers rather than one-directional pushers.
+#
+# Measured failure without it: every setpoint had been calibrated for S1's
+# lighter plant, so in S7 every xApp was PERMANENTLY unsatisfied and asked
+# for more of its knob every epoch.  Under the oracle -- perfect current
+# slopes -- all three quotas pinned at their maxima, both scheduler weights
+# at opposite bounds and mcs_T3 fell from 20 to 8 within 200 epochs, and
+# the oracle finished 0.25 IF BELOW all-reject.  The MCS xApp was the worst
+# case: its 26 kB buffer trigger lay below T3's 25th-percentile buffer
+# (39 kB), so it always fired, lowering MCS cut T3's throughput, which grew
+# the buffer, which fired it again.  A setpoint at the median is satisfied
+# about half the time, so each xApp pushes in BOTH directions and the
+# arbiter faces genuine, time-varying conflicts instead of a ratchet.
+xapps:
+  - {name: energy,   kind: energy,     tenant: HOST, param: txpower,
+     domain: [32.0, 46.0], step: 0.5, gain: 0.45, target: 36.5}
+  - {name: coverage, kind: coverage,   tenant: HOST, param: txpower,
+     domain: [32.0, 46.0], step: 0.5, gain: 0.55,
+     edge_trigger: 0.548, sinr_target: 17.2}
+  - {name: tiltctl,  kind: energy,     tenant: HOST, param: tilt,
+     domain: [2.0, 12.0], step: 0.5, gain: 0.5,
+     target: 9.0, target_alt: 7.0, period: 40}
+  - {name: tput_T1,  kind: throughput, tenant: T1, param: quota_T1,
+     domain: [10.0, 58.0], step: 1.0, gain: 2.4, target: 2.199, deadband: 0.12}
+  - {name: lat_T2,   kind: latency,    tenant: T2, param: quota_T2,
+     domain: [10.0, 54.0], step: 1.0, gain: 0.08, target: 32.96, deadband: 4.0}
+  - {name: rob_T3,   kind: throughput, tenant: T3, param: quota_T3,
+     domain: [6.0, 40.0], step: 1.0, gain: 3.0, target: 0.991, deadband: 0.05}
+  - {name: steer_T1, kind: steering,   tenant: T1, param: schedw_T1,
+     domain: [0.5, 2.0], step: 0.05, gain: 0.55, target: 81.2, deadband: 4.0}
+  - {name: steer_T2, kind: steering,   tenant: T2, param: schedw_T2,
+     domain: [0.5, 2.0], step: 0.05, gain: -0.45, target: 81.2, deadband: 4.0}
+  - {name: mcs_T3,   kind: robustness, tenant: T3, param: mcs_T3,
+     domain: [8.0, 27.0], step: 1.0, gain: 0.55, target: 50.5}
+
+ran:
+  allocation: shares
+  initial_controls:
+    tilt: 8.0
+  slices:
+    T1:
+      load_mbps_per_ue: 3.20
+      load_profile: {levels: [0.70, 1.35], hold_slots: 700, ramp_slots: 120, phase: 0}
+    T2:
+      load_mbps_per_ue: 3.05
+      load_profile: {levels: [1.35, 0.70], hold_slots: 700, ramp_slots: 120, phase: 0}
+    T3:
+      load_mbps_per_ue: 1.05
+      load_profile: {levels: [1.0], hold_slots: 1000000, phase: 0}
+  mobility:
+    mode: group_drift
+    drift:
+      tenants: [T1]
+      rate_m_per_slot: 0.0140
+      start_slot: 400
+      jitter_m_per_slot: 0.10
+    wander_radius_m: 35.0
+
+gates:
+  oracle_gain_min: 0.030
+  knowledge_gain_min: 0.050
+  control_gain_min: 0.030
+  conflict_gain_min: 0.030
+  agentic_gain_min: 0.010

@@ -1,0 +1,55 @@
+# ===========================================================================
+# S2 -- Traffic phase shift with no geometry change
+# ===========================================================================
+# The mirror image of S1.  Geometry is frozen; what moves is the offered
+# load, and it moves OUT OF PHASE across tenants so that the cell average
+# is nearly constant while individual tenants swing between load bands.
+#
+# This is the scenario the per-tenant regime label was invented for, and
+# it is included so the paper can separate two different things that both
+# get called "adaptation":
+#
+#   * S1 needs a NEW SLOPE   (the coefficient itself changed)
+#   * S2 needs a NEW LABEL   (the coefficient is fine; the wrong column of
+#                             the table is being read)
+#
+# INTACT-RA already handles S2 well, because per-tenant load is exactly
+# what its regime estimator measures.  An honest ablation table should
+# therefore show only a small agentic gain here.  A method that claims a
+# large gain on S2 as well is probably just noisier.
+
+_scenario_note: >
+  Out-of-phase per-tenant load swings at constant cell average and fixed
+  geometry. Exercises regime LABELLING, not slope staleness.
+
+run:
+  epochs: 800
+
+ran:
+  mobility:
+    mode: rwp
+    drift: {tenants: [], rate_m_per_slot: 0.0}
+  slices:
+    T1:
+      load_profile:
+        levels: [0.62, 1.45, 0.95]
+        hold_slots: 640
+        ramp_slots: 120
+        phase: 0
+    T2:
+      load_profile:
+        levels: [1.42, 0.65, 1.05]
+        hold_slots: 640
+        ramp_slots: 120
+        phase: 640            # antiphase with T1: cell average stays flat
+    T3:
+      load_profile:
+        levels: [0.85, 1.30]
+        hold_slots: 900
+        ramp_slots: 140
+        phase: 320
+
+gates:
+  drift_materiality_min: 0.0      # S2 is not a slope-drift scenario
+  regime_disagreement_min: 0.35   # but it MUST disagree on labels
+  agentic_gain_min: -0.020        # a small loss here is an honest result

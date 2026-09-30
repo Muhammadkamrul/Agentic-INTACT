@@ -1,0 +1,10 @@
+# INTACT-RA-Agentic. No deep-learning framework: every gradient in
+# agent/ is derived by hand and checked against central finite
+# differences in scripts/selftest.py. This keeps the near-real-time
+# latency measurements honest and makes runs bit-reproducible.
+numpy>=1.24
+pandas>=2.0
+scipy>=1.10
+matplotlib>=3.7
+PyYAML>=6.0
+scikit-learn>=1.3

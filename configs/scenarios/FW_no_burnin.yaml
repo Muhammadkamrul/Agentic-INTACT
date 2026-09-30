@@ -1,0 +1,348 @@
+# Factor-walk variant: S16_high_ceiling with no_burnin transplanted from S8_dedicated_contest. Diagnostic only.
+seed: 20260925
+run:
+  epochs: 500
+  seed: 20260925
+  seeds: [20260925, 20260926, 20260927, 20260928, 20260929]
+  results_root: results
+  checkpoint_every: 50
+  log_every: 25
+  warmup_epochs: 0
+  probe_as_claim: true
+  counterfactual: true
+  burn_in_epochs: 0
+  reset_at_boundary: true
+ran:
+  seed: 20260925
+  slot_ms: 10.0
+  slots_per_epoch: 8
+  pre_slots: 8
+  post_slots: 8
+  n_prb: 106
+  allocation: dedicated
+  prb_bandwidth_hz: 360000
+  carrier_ghz: 3.5
+  base_delay_ms: 2.0
+  max_queue_kb: 250.0
+  max_delay_ms: 1500.0
+  min_grant_prb: 0.5
+  edge_radius_m: 200.0
+  coverage_sinr_db: 5.0
+  coupling_subband: 1.0
+  coupling_txpower: 1.0
+  coupling_retx: 1.0
+  cio_load_gain: 0.05
+  actuation: {time_constant_epochs: 0.6, reconfig_slots: 2, reconfig_loss_frac: 0.35,
+    reconfig_cell_multiplier: 1.25}
+  channel: {los_model: true, fast_fading: true, noise_figure_db: 7.0, ue_height_m: 1.5,
+    bs_height_m: 25.0, shadow_sigma_los_db: 4.0, shadow_sigma_nlos_db: 6.0, shadow_decorr_m: 37.0,
+    rician_k_db: 9.0, vertical_hpbw_deg: 10.0, sla_v_db: 30.0, antenna_gain_dbi: 15.0,
+    bler_slope_db: 1.1, max_harq_retx: 3, isd_m: 700.0, neighbour_tx_dbm: 40.0, neighbour_load: 0.55}
+  mobility:
+    mode: group_drift
+    min_radius_m: 25.0
+    max_radius_m: 320.0
+    speed_mps_min: 0.4
+    speed_mps_max: 2.4
+    pause_prob: 0.02
+    drift:
+      tenants: [T1]
+      rate_m_per_slot: -0.028
+      start_slot: 1600
+      jitter_m_per_slot: 0.1
+    diurnal: {}
+    wander_radius_m: 35.0
+  traffic: {model: onoff, packet_bytes: 1200, on_mean_slots: 24.0, off_mean_slots: 12.0,
+    burstiness: 1.0}
+  slices:
+    T1:
+      n_ue: 12
+      load_mbps_per_ue: 0.7
+      load_spread: 0.22
+      qos_throughput_mbps: 3.6
+      qos_delay_ms: 40.0
+      qos_bler: 0.1
+      placement: {radius_min_m: 250.0, radius_max_m: 310.0, angle_min_deg: 0.0, angle_max_deg: 130.0,
+        speed_mps_min: 0.4, speed_mps_max: 1.6}
+      load_profile:
+        levels: [1.0]
+        hold_slots: 1000000
+        phase: 0
+    T2:
+      n_ue: 10
+      load_mbps_per_ue: 2.0
+      load_spread: 0.3
+      qos_throughput_mbps: 3.0
+      qos_delay_ms: 22.0
+      qos_bler: 0.08
+      placement: {radius_min_m: 40.0, radius_max_m: 130.0, angle_min_deg: 150.0, angle_max_deg: 300.0,
+        speed_mps_min: 0.3, speed_mps_max: 1.2}
+      load_profile:
+        levels: [2.0, 0.3]
+        hold_slots: 700
+        ramp_slots: 80
+        phase: 0
+    T3:
+      n_ue: 14
+      load_mbps_per_ue: 0.65
+      load_spread: 0.18
+      qos_throughput_mbps: 0.9
+      qos_delay_ms: 60.0
+      qos_bler: 0.12
+      placement: {radius_min_m: 170.0, radius_max_m: 280.0, angle_min_deg: 300.0,
+        angle_max_deg: 420.0, speed_mps_min: 0.2, speed_mps_max: 0.8}
+      load_profile:
+        levels: [0.3, 2.0]
+        hold_slots: 700
+        ramp_slots: 80
+        phase: 0
+  initial_controls: {txpower: 40.0, tilt: 8.0, quota_T1: 32.0, quota_T2: 20.0, quota_T3: 30.0,
+    schedw_T1: 1.0, schedw_T2: 1.0, mcs_T3: 20.0, quota_T1b: 14.0, quota_T2b: 10.0}
+  envelopes:
+    T1: {prb: 48.0}
+    T2: {prb: 52.0}
+    T3: {prb: 44.0}
+tenants:
+- tid: T1
+  omega: 1.0
+  rho_min: 0.8
+  envelope: {prb: 48.0}
+- tid: T2
+  omega: 1.0
+  rho_min: 0.8
+  envelope: {prb: 52.0}
+- tid: T3
+  omega: 1.0
+  rho_min: 0.8
+  envelope: {prb: 44.0}
+- tid: HOST
+  omega: 1.0
+  rho_min: 0.6
+  is_host: true
+  envelope: {}
+intents:
+- {iid: i1, tenant: T1, kpi: served_ratio, target: 0.95, direction: higher_better,
+  pi_class: 1.0, weight: 1.0, epsilon: 0.02}
+- {iid: i2, tenant: T1, kpi: delay_p90_ms, target: 100.0, direction: lower_better,
+  pi_class: 1.0, weight: 1.0, epsilon: 0.02}
+- {iid: i3, tenant: T2, kpi: served_ratio, target: 0.95, direction: higher_better,
+  pi_class: 1.0, weight: 1.0, epsilon: 0.02}
+- {iid: i4, tenant: T2, kpi: delay_p90_ms, target: 30.0, direction: lower_better,
+  pi_class: 1.0, weight: 1.0, epsilon: 0.02}
+- {iid: i5, tenant: T3, kpi: served_ratio, target: 0.95, direction: higher_better,
+  pi_class: 1.0, weight: 1.0, epsilon: 0.02}
+- {iid: i6, tenant: T3, kpi: delay_p90_ms, target: 300.0, direction: lower_better,
+  pi_class: 1.0, weight: 1.0, epsilon: 0.02}
+claims:
+- jid: j1
+  xapp: srv_T1
+  tenant: T1
+  param: quota_T1
+  scope: slice
+  kind: allocative
+  domain: [6.0, 40.0]
+  step: 1.0
+  max_step_frac: 0.2
+  resource: prb
+  d_bar: 48.0
+  r_j: 0.6
+- jid: j2
+  xapp: lat_T1
+  tenant: T1
+  param: quota_T1b
+  scope: slice
+  kind: allocative
+  domain: [4.0, 24.0]
+  step: 1.0
+  max_step_frac: 0.25
+  resource: prb
+  d_bar: 48.0
+  r_j: 0.6
+- jid: j3
+  xapp: srv_T2
+  tenant: T2
+  param: quota_T2
+  scope: slice
+  kind: allocative
+  domain: [6.0, 40.0]
+  step: 1.0
+  max_step_frac: 0.2
+  resource: prb
+  d_bar: 52.0
+  r_j: 0.6
+- jid: j4
+  xapp: lat_T2
+  tenant: T2
+  param: quota_T2b
+  scope: slice
+  kind: allocative
+  domain: [4.0, 28.0]
+  step: 1.0
+  max_step_frac: 0.25
+  resource: prb
+  d_bar: 52.0
+  r_j: 0.6
+- jid: j5
+  xapp: srv_T3
+  tenant: T3
+  param: quota_T3
+  scope: slice
+  kind: allocative
+  domain: [6.0, 44.0]
+  step: 1.0
+  max_step_frac: 0.2
+  resource: prb
+  d_bar: 44.0
+  r_j: 0.6
+- jid: j6
+  xapp: lat_T3
+  tenant: T3
+  param: quota_T3
+  scope: slice
+  kind: allocative
+  domain: [6.0, 44.0]
+  step: 1.0
+  max_step_frac: 0.2
+  resource: prb
+  d_bar: 44.0
+  r_j: 0.6
+xapps:
+- name: srv_T1
+  kind: throughput
+  tenant: T1
+  param: quota_T1
+  kpi: served_ratio
+  domain: [6.0, 40.0]
+  step: 1.0
+  gain: 25.0
+  target: 0.95
+  deadband: 0.02
+- name: lat_T1
+  kind: latency
+  tenant: T1
+  param: quota_T1b
+  kpi: delay_p90_ms
+  domain: [4.0, 24.0]
+  step: 1.0
+  gain: 0.05
+  target: 100.0
+  deadband: 10.0
+- name: srv_T2
+  kind: throughput
+  tenant: T2
+  param: quota_T2
+  kpi: served_ratio
+  domain: [6.0, 40.0]
+  step: 1.0
+  gain: 25.0
+  target: 0.95
+  deadband: 0.02
+- name: lat_T2
+  kind: latency
+  tenant: T2
+  param: quota_T2b
+  kpi: delay_p90_ms
+  domain: [4.0, 28.0]
+  step: 1.0
+  gain: 0.2
+  target: 30.0
+  deadband: 3.0
+- name: srv_T3
+  kind: throughput
+  tenant: T3
+  param: quota_T3
+  kpi: served_ratio
+  domain: [6.0, 44.0]
+  step: 1.0
+  gain: 25.0
+  target: 0.95
+  deadband: 0.02
+- name: lat_T3
+  kind: latency
+  tenant: T3
+  param: quota_T3
+  kpi: delay_p90_ms
+  domain: [6.0, 44.0]
+  step: 1.0
+  gain: 0.02
+  target: 300.0
+  deadband: 30.0
+arbiter:
+  epsilon: 0.02
+  margin_clip: 3.0
+  max_step_frac: 0.2
+  uncertainty_beta: 1.5
+  lambda_risk: 0.0
+  lambda_churn: 0.0
+  action_cost: 0.0003
+  protect_only_safe: true
+  max_enumerate_claims: 14
+  abstain_on_unknown: false
+  unknown_impact_threshold: 0.02
+  greedy_fallback: true
+  use_intent_weights: false
+  sigma_min: 0.0005
+  c2_cell_pool: true
+  pool_transfers: true
+  objective: linear
+  prob_sigma_floor: 0.03
+  tie_break: 0.05
+  regime_load_edges: [0.9, 1.25]
+  regime_pressure_edges: [0.9, 1.1]
+  regime_coverage_edge: 0.35
+  channel_aware_regime: false
+calibration:
+  base_seed: 101
+  sweep_points: 7
+  replicates: 6
+  settle_slots: 32
+  measure_slots: 48
+  sweep_load_scales: [0.7, 1.0, 1.35]
+  cache: artifacts/sensitivity_prior.json
+agent:
+  sensitivity:
+    unknown_sigma: 0.05
+    forgetting: 0.985
+    prior_ridge: 12.0
+    p0: 0.01
+    max_sigma: 0.25
+    promote_min_obs: 6
+    promote_min_improvement: 0.02
+    holdout_epochs: 6
+    backoff_sigma_mult: 1.6
+    backoff_sigma_add: 0.004
+    stale_resid_mult: 2.5
+    stale_window: 12
+    dose_scale: {txpower: 1.0, tilt: 1.0, quota_T1: 1.0, quota_T2: 1.0, quota_T3: 1.0,
+      schedw_T1: 10.0, schedw_T2: 10.0, mcs_T3: 1.0}
+  context: {hidden: 24, embed: 12, lr: 0.003, warmup_epochs: 20, buffer: 240, batch: 16,
+    updates_per_epoch: 2, huber_delta: 0.5, confidence_scale: 0.25, max_sessions_per_slice: 24,
+    rho_proxy_scale: 1.0, rho_proxy_offset: 0.0}
+  policy: {hidden: 32, embed: 12, top_k: 6, lr: 0.001, clip_eps: 0.2, gamma: 0.9,
+    gae_lambda: 0.95, epochs_per_update: 4, batch: 32, buffer: 256, entropy_coef: 0.01,
+    value_coef: 0.5, warmup_epochs: 40, latency_cost: 0.02, regret_scale: 0.02, outcome_gain: 1.0,
+    explore_logit_noise: 0.15, max_sessions_per_slice: 24}
+  kalman: {structural_kappa: 0.5, sigma_floor: 0.002, process_q: 0.05, change_threshold: 4.0,
+    change_ewma: 0.2, noise_ewma: 0.05, noise_floor: 0.0001, analytic_prior: false}
+  twin: {enabled: true, every_eval: 1, every_burn_in: 5, replicates: 2, settle_slots: 8,
+    measure_slots: 24, probe_frac: 0.5, pos_sigma_m: 25.0, nf_err_sd_db: 1.0, load_err_sd: 0.2,
+    variance_inflation: 4.0}
+  supervisor: {enabled: true, interval_epochs: 5, probe_budget_per_100: 15.0, probe_dose_frac: 0.35,
+    max_probes_per_epoch: 1, min_probe_gap_epochs: 3, risk_eps: 0.01, relevance_window: 20,
+    rollback_window: 15, escalate_on_unknown: true}
+oracle: {refresh_every: 10, refresh_every_eval: 0, replicates: 6, rollout_top_m: 6,
+  rollout_reps: 2, rollout_horizon_epochs: 2, settle_slots: 16, measure_slots: 48,
+  probe_frac: 0.5}
+report:
+  telemetry: {enabled: true, ue_every_slots: 8, slice_every_slots: 1, max_ue_rows: 400000}
+  figures: true
+  dpi: 160
+gates: {enabled: true, control_gain_min: 0.03, conflict_gain_min: 0.03, drift_materiality_min: 2.0,
+  regime_disagreement_min: 0.2, agentic_gain_min: 0.01, max_safety_crossings_best: 1000,
+  probe_epochs: 220, oracle_gain_min: 0.03}
+_base_path: /home/claude/build/intact_agentic_v1/configs/base.yaml
+_scenario_path: /home/claude/build/intact_agentic_v1/configs/scenarios/S16_high_ceiling.yaml
+_scenario_name: S16_high_ceiling
+_replace_sections: [tenants, intents, claims, xapps]
+_scenario_note: 'Factor-walk variant: S16_high_ceiling with no_burnin transplanted
+  from S8_dedicated_contest. Diagnostic only.'

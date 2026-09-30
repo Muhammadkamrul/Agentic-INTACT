@@ -1,0 +1,130 @@
+# ===========================================================================
+# S13 -- Selective release under partially coincident overload
+# ===========================================================================
+# THE DESIGN SPACE, AS MEASURED
+# ------------------------------
+# S12 under two allocation models failed in mirror-image ways:
+#   idle remainder    releasing below the pool strands capacity; INTACT-RA
+#                     walked total reservation to ~68/106 PRB and lost to
+#                     all-reject (Agentic stopped near ~89 and beat it by
+#                     ~+0.29, but all-reject still won)
+#   shared remainder  releasing is free; all-accept drove every quota to its
+#                     floor, turning the cell into a work-conserving pool,
+#                     and WON (0.801 vs 0.790 for all-reject)
+# The cause is the load pattern.  T2 and T3 were EXACTLY out of phase, so
+# their overloads never coincided, statistical multiplexing was perfect,
+# and a dedicated reservation bought nothing.  Operators pay for dedicated
+# capacity to get ISOLATION WHEN SEVERAL SLICES ARE OVERLOADED AT ONCE.
+#
+# S13 makes that happen.  Four load segments per cycle:
+#     T2 alone overloaded | BOTH overloaded | T3 alone | both light
+# During the coincident quarter a shared pool cannot serve everyone, so
+# releasing T2's or T3's reservation costs them their isolation, and
+# release-everything is no longer free.  T1's own unused dedicated PRBs are
+# still not shared, so after T1 moves inward, holding its reservation
+# wastes capacity exactly when it is most needed.
+#
+# The decision is therefore WHICH reservation to release: T1's yes, T2's
+# and T3's no.  That depends on each tenant's CURRENT need, which a table
+# calibrated with T1 at the edge gets wrong for T1.
+#
+# Loads are sized so coincident overload exceeds the pool even after T1 has
+# moved inward (~44 + ~50 + ~15 PRB against 106), otherwise sharing would
+# always suffice after the migration and release-everything would win.
+#
+# GATES, declared before any controller is run (scripts/policy_headroom.py)
+#   selective release after migration - hold everything  >= 0.05, >=4/5 seeds
+#   selective release after migration - release everything >= 0.05
+#   releasing T1 BEFORE migration hurts in the pre window
+
+_scenario_note: >
+  Constant-load inward migration of T1 under dedicated reservations with a
+  shared remainder, and partially coincident T2/T3 overload, so that the
+  decision is WHICH reservation to release.
+
+run:
+  epochs: 500
+  # Epochs 0-99 are the stationary SLA window: every method learns there,
+  # unscored.  Scoring starts at epoch 100 -- where the migration begins --
+  # from a common plant state.  So the benchmark measures adaptation to the
+  # change, not damage done while learning the stationary plant.
+  burn_in_epochs: 100
+
+_replace_sections: [intents, xapps, claims]
+
+claims:
+  - {jid: j4, xapp: tput_T1,   tenant: T1, param: quota_T1, scope: slice,
+     kind: allocative, domain: [10.0, 60.0], step: 1.0, max_step_frac: 0.15,
+     resource: prb, d_bar: 60.0, r_j: 0.70}
+  - {jid: j5, xapp: lat_T2,    tenant: T2, param: quota_T2, scope: slice,
+     kind: allocative, domain: [10.0, 54.0], step: 1.0, max_step_frac: 0.15,
+     resource: prb, d_bar: 54.0, r_j: 0.65}
+  - {jid: j6, xapp: rob_T3,    tenant: T3, param: quota_T3, scope: slice,
+     kind: allocative, domain: [6.0, 44.0], step: 1.0, max_step_frac: 0.15,
+     resource: prb, d_bar: 44.0, r_j: 0.45}
+
+xapps:
+  - {name: tput_T1, kind: throughput, tenant: T1, param: quota_T1,
+     domain: [10.0, 60.0], step: 1.0, gain: 2.4, target: 1.5, deadband: 0.10}
+  - {name: lat_T2,  kind: latency,    tenant: T2, param: quota_T2,
+     domain: [10.0, 54.0], step: 1.0, gain: 0.5, target: 5.0, deadband: 0.5}
+  - {name: rob_T3,  kind: throughput, tenant: T3, param: quota_T3,
+     domain: [6.0, 44.0], step: 1.0, gain: 3.0, target: 0.7, deadband: 0.05}
+
+tenants:
+  - {tid: T1, omega: 1.0, rho_min: 0.80, envelope: {prb: 60.0}}
+  - {tid: T2, omega: 1.0, rho_min: 0.80, envelope: {prb: 54.0}}
+  - {tid: T3, omega: 1.0, rho_min: 0.75, envelope: {prb: 44.0}}
+  - {tid: HOST, omega: 1.0, rho_min: 0.60, is_host: true, envelope: {}}
+
+ran:
+  allocation: dedicated_shared
+  envelopes:
+    T1: {prb: 60.0}
+    T2: {prb: 54.0}
+    T3: {prb: 44.0}
+  initial_controls:
+    txpower: 40.0
+    tilt: 8.0
+    quota_T1: 50.0          # provisioned for T1 at the edge, where it is
+    quota_T2: 38.0          # capacity-limited; sum 118 > 106 so the pool is
+    quota_T3: 30.0          # always fully reserved
+  slices:
+    T1:
+      load_mbps_per_ue: 2.2
+      placement: {radius_min_m: 250.0, radius_max_m: 310.0}
+      load_profile: {levels: [1.0], hold_slots: 1000000, phase: 0}
+    T2:
+      load_mbps_per_ue: 5.0
+      load_profile: {levels: [1.60, 1.60, 0.60, 0.60], hold_slots: 350, ramp_slots: 60, phase: 0}
+    T3:
+      load_mbps_per_ue: 2.0
+      load_profile: {levels: [1.60, 1.60, 0.60, 0.60], hold_slots: 350, ramp_slots: 60, phase: 3}
+  mobility:
+    mode: group_drift
+    drift:
+      tenants: [T1]
+      rate_m_per_slot: -0.028     # NEGATIVE = inward: ~280 m -> ~100 m
+      start_slot: 1600            # epochs 0-99 stationary: the SLA window
+      jitter_m_per_slot: 0.10
+    wander_radius_m: 35.0
+
+gates:
+  oracle_gain_min: 0.030
+  control_gain_min: 0.030
+  conflict_gain_min: 0.030
+  agentic_gain_min: 0.010
+
+# >>> CALIBRATED -- written by scripts/calibrate_targets.py; do not edit by hand
+intents:
+  - {iid: i1, tenant: T1, kpi: throughput_mbps, target: 1.418, direction: higher_better, pi_class: 1.0, weight: 1.0, epsilon: 0.02}
+  - {iid: i2, tenant: T1, kpi: delay_ms, target: 822.42, direction: lower_better, pi_class: 1.0, weight: 1.0, epsilon: 0.02}   # delay_ms: delay_p50 IQR degenerate here
+  - {iid: i3, tenant: T2, kpi: throughput_mbps, target: 2.872, direction: higher_better, pi_class: 1.0, weight: 1.0, epsilon: 0.02}
+  - {iid: i4, tenant: T2, kpi: delay_p90_ms, target: 1108.97, direction: lower_better, pi_class: 1.0, weight: 1.0, epsilon: 0.02}   # delay_p90_ms: delay_p50 IQR degenerate here
+  - {iid: i5, tenant: T3, kpi: throughput_mbps, target: 1.084, direction: higher_better, pi_class: 1.0, weight: 1.0, epsilon: 0.02}
+  - {iid: i6, tenant: T3, kpi: delay_ms, target: 1125.15, direction: lower_better, pi_class: 1.0, weight: 1.0, epsilon: 0.02}   # delay_ms: delay_p50 IQR degenerate here
+xapps:
+  - {name: tput_T1, kind: throughput, tenant: T1, param: quota_T1, domain: [10.0, 60.0], step: 1.0, gain: 2.4, target: 1.418, deadband: 0.1}
+  - {name: lat_T2, kind: latency, tenant: T2, param: quota_T2, domain: [10.0, 54.0], step: 1.0, gain: 0.008, target: 474.43, deadband: 47.44}
+  - {name: rob_T3, kind: throughput, tenant: T3, param: quota_T3, domain: [6.0, 44.0], step: 1.0, gain: 3.0, target: 1.084, deadband: 0.1}
+# <<< CALIBRATED

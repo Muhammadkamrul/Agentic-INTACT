@@ -1,0 +1,528 @@
+# ===========================================================================
+# INTACT-RA-Agentic : base configuration
+# ===========================================================================
+# Every scenario file in configs/scenarios/ is a DELTA on this file.  The
+# merge is deep, except for the list sections named in config._replace_sections
+# (tenants / intents / claims / xapps), which a scenario replaces wholesale
+# if it declares them at all.
+#
+# The numbers below are not arbitrary.  Three of them decide whether the
+# benchmark is meaningful at all, and each is explained where it appears:
+#
+#   ran.actuation.reconfig_slots / reconfig_loss_frac
+#        make WRITING expensive, so "accept everything" loses.
+#   ran.mobility.drift + ran.slices.*.load_profile
+#        make the plant NON-STATIONARY, so "reject everything" loses.
+#   ran.mobility.drift on a tenant whose offered load is CONSTANT
+#        makes the static sensitivity table go stale without changing the
+#        load label it is indexed by, so INTACT-RA loses to the agentic
+#        version.  This is emergent physics, not a scripted step.
+# ===========================================================================
+
+seed: 20260925
+
+# ---------------------------------------------------------------------------
+run:
+  epochs: 800
+  seed: 20260925
+  seeds: [20260925, 20260926, 20260927, 20260928, 20260929]
+  results_root: results
+  checkpoint_every: 50        # resumable: state written every N epochs
+  log_every: 25
+  warmup_epochs: 0            # epochs excluded from the headline metrics
+  probe_as_claim: true        # a calibration probe passes the SAME filters
+  counterfactual: true        # paired no-write arm for CAUSAL safety/error
+  burn_in_epochs: 0           # >0: unscored learning phase, then a COMMON
+  reset_at_boundary: true     #   plant state for every method; RL proposer
+                              #   frozen during evaluation
+
+# ---------------------------------------------------------------------------
+ran:
+  seed: 20260925
+  slot_ms: 10.0              # one measurement slot
+  slots_per_epoch: 8
+  pre_slots: 8               # observe the state the decision is made FROM
+  post_slots: 8              # observe the consequence of the writes
+                             # -> one arbitration epoch is 160 ms (near-RT)
+
+  n_prb: 106                 # 40 MHz @ 30 kHz SCS, 3GPP TS 38.101 Table 5.3.2-1
+
+  # Inter-slice PRB allocation.
+  #   legacy : each slice hard-capped at share*quota; scale-down only when
+  #            total demand exceeds the pool.  Unused quota is WASTED and
+  #            raising a cap costs nobody anything while there is slack.
+  #   shares : work-conserving weighted-fair water-filling.  Quotas are
+  #            weights; the whole pool is divided among backlogged slices;
+  #            ZERO-SUM whenever two or more slices are backlogged, but a
+  #            tenant's slope then depends on EVERYONE's backlog.
+  #   dedicated : normalised dedicated reservations (3GPP dedicated-ratio
+  #            semantics).  Zero-sum AND own-state dependent.  Capacity
+  #            left unreserved when quotas sum below the pool is IDLE.
+  #   dedicated_shared : as dedicated, but the unreserved remainder is
+  #            shared max-min fairly among backlogged slices (3GPP RRM
+  #            policy semantics).  The headline scenario uses this.
+  # See FINDINGS.md for why this decides whether sensitivity knowledge can
+  # have any value at all.
+  allocation: legacy
+  prb_bandwidth_hz: 360000   # 12 subcarriers x 30 kHz
+  carrier_ghz: 3.5           # n78
+
+  base_delay_ms: 2.0         # fixed processing/propagation floor
+  max_queue_kb: 250.0        # per-UE buffer; beyond this, packets drop
+  max_delay_ms: 1500.0       # reported queueing delay is clipped here
+  min_grant_prb: 0.5         # smallest grant the MAC can issue (delay floor)
+  edge_radius_m: 200.0
+  coverage_sinr_db: 5.0
+
+  # cross-tenant coupling gains (1.0 = fully on).  Setting any of these to
+  # 0 turns off one of the three mechanisms that make arbitration necessary.
+  coupling_subband: 1.0      # (a) scheduler-weight steering is zero-sum
+  coupling_txpower: 1.0      # (b) power helps coverage-limited tenants most
+  coupling_retx: 1.0         # (c) retransmissions consume the shared pool
+  cio_load_gain: 0.05
+
+  # -- actuation cost ------------------------------------------------------
+  # THE reason all-accept must lose.  Every executed write reprograms the
+  # O-DU: the affected slices lose `reconfig_loss_frac` of their capacity
+  # for `reconfig_slots` slots.  A cell-scope write (txpower, tilt) charges
+  # every slice.  Two writes to the same slice in one epoch charge twice.
+  actuation:
+    time_constant_epochs: 0.6    # first-order actuator lag
+    reconfig_slots: 2            # of the 16 slots in an epoch
+    reconfig_loss_frac: 0.35
+    reconfig_cell_multiplier: 1.25
+
+  channel:
+    los_model: true
+    fast_fading: true
+    noise_figure_db: 7.0
+    ue_height_m: 1.5
+    bs_height_m: 25.0
+    shadow_sigma_los_db: 4.0
+    shadow_sigma_nlos_db: 6.0
+    shadow_decorr_m: 37.0
+    rician_k_db: 9.0
+    vertical_hpbw_deg: 10.0
+    sla_v_db: 30.0
+    antenna_gain_dbi: 15.0
+    bler_slope_db: 1.1
+    max_harq_retx: 3
+    isd_m: 700.0
+    neighbour_tx_dbm: 40.0
+    neighbour_load: 0.55
+
+  mobility:
+    mode: rwp
+    min_radius_m: 25.0
+    max_radius_m: 320.0
+    speed_mps_min: 0.4
+    speed_mps_max: 2.4
+    pause_prob: 0.02
+    drift:
+      tenants: []
+      rate_m_per_slot: 0.0
+      start_slot: 0
+      jitter_m_per_slot: 0.0
+    diurnal: {}
+
+  traffic:
+    model: onoff
+    packet_bytes: 1200
+    on_mean_slots: 24.0
+    off_mean_slots: 12.0
+    burstiness: 1.0
+
+  # -- slices --------------------------------------------------------------
+  # `placement` declares WHERE a tenant's users live, which is what makes a
+  # tenant coverage-limited or capacity-limited.  T1 sits mid-cell (so a
+  # later outward drift genuinely changes its physics); T2 is close in and
+  # capacity-limited; T3 is a sparse far-out meter population.
+  slices:
+    T1:
+      n_ue: 12
+      load_mbps_per_ue: 2.00
+      load_spread: 0.22
+      qos_throughput_mbps: 3.6
+      qos_delay_ms: 40.0
+      qos_bler: 0.10
+      placement:
+        radius_min_m: 130.0
+        radius_max_m: 210.0
+        angle_min_deg: 0.0
+        angle_max_deg: 130.0
+        speed_mps_min: 0.4
+        speed_mps_max: 1.6
+      load_profile:
+        levels: [1.0]
+        hold_slots: 100000
+        phase: 0
+    T2:
+      n_ue: 10
+      load_mbps_per_ue: 1.90
+      load_spread: 0.30
+      qos_throughput_mbps: 3.0
+      qos_delay_ms: 22.0
+      qos_bler: 0.08
+      placement:
+        radius_min_m: 40.0
+        radius_max_m: 130.0
+        angle_min_deg: 150.0
+        angle_max_deg: 300.0
+        speed_mps_min: 0.3
+        speed_mps_max: 1.2
+      load_profile:
+        levels: [0.72, 1.32, 0.95]
+        hold_slots: 900
+        ramp_slots: 140
+        phase: 0
+    T3:
+      n_ue: 14
+      load_mbps_per_ue: 0.65
+      load_spread: 0.18
+      qos_throughput_mbps: 0.9
+      qos_delay_ms: 60.0
+      qos_bler: 0.12
+      placement:
+        radius_min_m: 170.0
+        radius_max_m: 280.0
+        angle_min_deg: 300.0
+        angle_max_deg: 420.0
+        speed_mps_min: 0.2
+        speed_mps_max: 0.8
+      load_profile:
+        levels: [1.22, 0.80]
+        hold_slots: 700
+        ramp_slots: 90
+        phase: 380
+
+  initial_controls:
+    txpower: 40.0
+    tilt: 6.0
+    quota_T1: 38.0
+    quota_T2: 34.0
+    quota_T3: 22.0
+    schedw_T1: 1.0
+    schedw_T2: 1.0
+    mcs_T3: 20.0
+
+  envelopes:
+    T1: {prb: 58.0}
+    T2: {prb: 54.0}
+    T3: {prb: 40.0}
+
+# ---------------------------------------------------------------------------
+tenants:
+  - {tid: T1, omega: 1.0,  rho_min: 0.80, envelope: {prb: 58.0}}
+  - {tid: T2, omega: 0.95, rho_min: 0.80, envelope: {prb: 54.0}}
+  - {tid: T3, omega: 0.70, rho_min: 0.75, envelope: {prb: 40.0}}
+  - {tid: HOST, omega: 0.60, rho_min: 0.60, is_host: true, envelope: {}}
+
+# ---------------------------------------------------------------------------
+# pi_class is the intent-class weight used by wIF.  epsilon is the safety
+# floor: an intent that is currently at or above it must not be pushed
+# below it by a write we choose.
+# Targets are set at the MEASURED MEDIAN of a passive plant (see
+# scripts/calibrate.py), so every intent is genuinely contestable: a
+# do-nothing controller sits near 50% fulfilment on each one and a
+# controller can move it either way.  An intent that is always met or
+# never met carries no information about the controller.
+intents:
+  - {iid: i1, tenant: T1, kpi: throughput_mbps, target: 1.70, direction: higher_better,
+     pi_class: 1.00, weight: 1.0, epsilon: 0.02}
+  - {iid: i2, tenant: T1, kpi: delay_p50_ms,    target: 115.0, direction: lower_better,
+     pi_class: 0.75, weight: 1.0, epsilon: 0.02}
+  - {iid: i3, tenant: T2, kpi: delay_p50_ms,    target: 7.5, direction: lower_better,
+     pi_class: 1.00, weight: 1.0, epsilon: 0.02}
+  - {iid: i4, tenant: T2, kpi: throughput_mbps, target: 1.72, direction: higher_better,
+     pi_class: 0.85, weight: 1.0, epsilon: 0.02}
+  - {iid: i5, tenant: T3, kpi: throughput_mbps, target: 0.57, direction: higher_better,
+     pi_class: 0.70, weight: 1.0, epsilon: 0.02}
+  - {iid: i7, tenant: T3, kpi: delay_p50_ms,    target: 167.0, direction: lower_better,
+     pi_class: 0.55, weight: 1.0, epsilon: 0.02}
+  # The host's power cap. At the initial 40 dBm this intent is just
+  # violated; the energy xApp's 38.5 dBm would satisfy it and the coverage
+  # xApp's 40.5 dBm would worsen it. Which of the two is right depends on
+  # a slope that drifts, which is the whole point of the C1 conflict.
+  - {iid: i6, tenant: HOST, kpi: txpower_dbm,   target: 40.0, direction: lower_better,
+     pi_class: 0.60, weight: 1.0, epsilon: 0.0}
+
+# ---------------------------------------------------------------------------
+# Nine claims.  j1/j2 are the direct C1 conflict: two xApps write txpower
+# and want opposite directions, and which one is right depends on a slope
+# that drifts.  The quota claims compete for a shared PRB pool (C2).
+claims:
+  - {jid: j1, xapp: energy,    tenant: HOST, param: txpower, scope: cell,
+     kind: regulative, domain: [32.0, 46.0], step: 0.5, max_step_frac: 0.20,
+     r_j: 0.40}
+  - {jid: j2, xapp: coverage,  tenant: HOST, param: txpower, scope: cell,
+     kind: regulative, domain: [32.0, 46.0], step: 0.5, max_step_frac: 0.20,
+     r_j: 0.55}
+  - {jid: j3, xapp: tiltctl,   tenant: HOST, param: tilt, scope: cell,
+     kind: regulative, domain: [2.0, 12.0], step: 0.5, max_step_frac: 0.25,
+     r_j: 0.35}
+  - {jid: j4, xapp: tput_T1,   tenant: T1, param: quota_T1, scope: slice,
+     kind: allocative, domain: [10.0, 58.0], step: 1.0, max_step_frac: 0.15,
+     resource: prb, d_bar: 58.0, r_j: 0.70}
+  - {jid: j5, xapp: lat_T2,    tenant: T2, param: quota_T2, scope: slice,
+     kind: allocative, domain: [10.0, 54.0], step: 1.0, max_step_frac: 0.15,
+     resource: prb, d_bar: 54.0, r_j: 0.65}
+  - {jid: j6, xapp: rob_T3,    tenant: T3, param: quota_T3, scope: slice,
+     kind: allocative, domain: [6.0, 40.0], step: 1.0, max_step_frac: 0.15,
+     resource: prb, d_bar: 40.0, r_j: 0.45}
+  - {jid: j7, xapp: steer_T1,  tenant: T1, param: schedw_T1, scope: slice,
+     kind: allocative, domain: [0.5, 2.0], step: 0.05, max_step_frac: 0.25,
+     r_j: 0.50}
+  - {jid: j8, xapp: steer_T2,  tenant: T2, param: schedw_T2, scope: slice,
+     kind: allocative, domain: [0.5, 2.0], step: 0.05, max_step_frac: 0.25,
+     r_j: 0.50}
+  - {jid: j9, xapp: mcs_T3,    tenant: T3, param: mcs_T3, scope: slice,
+     kind: regulative, domain: [8.0, 27.0], step: 1.0, max_step_frac: 0.25,
+     r_j: 0.30}
+
+# ---------------------------------------------------------------------------
+# The xApps are black boxes: they are never retrained, and every method sees
+# exactly the same proposal stream (see xapps.collect_proposals).
+xapps:
+  # Host energy saver: pulls txpower toward a low setpoint.  `gain` is the
+  # fraction of the remaining error it asks for in one epoch.
+  - {name: energy,   kind: energy,     tenant: HOST, param: txpower,
+     domain: [32.0, 46.0], step: 0.5, gain: 0.45, target: 36.5}
+
+  # Host coverage keeper: writes the SAME knob and wants the opposite thing
+  # whenever the edge population suffers.  This is the direct C1 conflict,
+  # and which side is right depends on a slope that drifts.
+  - {name: coverage, kind: coverage,   tenant: HOST, param: txpower,
+     domain: [32.0, 46.0], step: 0.5, gain: 0.55,
+     edge_trigger: 0.22, sinr_target: 7.5}
+
+  # Tilt controller: alternates between two electrical-downtilt setpoints,
+  # so the tilt claim is present regularly without being trivially constant.
+  - {name: tiltctl,  kind: energy,     tenant: HOST, param: tilt,
+     domain: [2.0, 12.0], step: 0.5, gain: 0.5,
+     target: 7.0, target_alt: 5.0, period: 40}
+
+  - {name: tput_T1,  kind: throughput, tenant: T1, param: quota_T1,
+     domain: [10.0, 58.0], step: 1.0, gain: 2.4,
+     target: 3.55, deadband: 0.12}
+
+  - {name: lat_T2,   kind: latency,    tenant: T2, param: quota_T2,
+     domain: [10.0, 54.0], step: 1.0, gain: 0.55,
+     target: 23.0, deadband: 1.5}
+
+  - {name: rob_T3,   kind: throughput, tenant: T3, param: quota_T3,
+     domain: [6.0, 40.0], step: 1.0, gain: 3.0,
+     target: 1.02, deadband: 0.05}
+
+  - {name: steer_T1, kind: steering,   tenant: T1, param: schedw_T1,
+     domain: [0.5, 2.0], step: 0.05, gain: 0.55,
+     target: 74.0, deadband: 6.0}
+
+  - {name: steer_T2, kind: steering,   tenant: T2, param: schedw_T2,
+     domain: [0.5, 2.0], step: 0.05, gain: -0.45,
+     target: 74.0, deadband: 6.0}
+
+  # A robustness xApp that lowers the MCS ceiling when T3's buffer grows.
+  # It is not always right -- which is the point: xApps are black boxes.
+  - {name: mcs_T3,   kind: robustness, tenant: T3, param: mcs_T3,
+     domain: [8.0, 27.0], step: 1.0, gain: 0.55, target: 26.0}
+
+# ---------------------------------------------------------------------------
+arbiter:
+  epsilon: 0.02                 # default safety floor
+  margin_clip: 3.0
+  max_step_frac: 0.20           # default one-epoch trust region
+  uncertainty_beta: 1.5         # robust bound  g_low = g_hat - beta*sigma
+  # The ROBUST FLOOR (uncertainty_beta, below) is the hard safety
+  # guarantee: no write may push a currently-safe intent's lower bound
+  # under its floor.  lambda_risk additionally penalised sigma inside the
+  # utility, which double-counts the same uncertainty and does so
+  # ASYMMETRICALLY: an online estimator reporting an honest, wider in-run
+  # standard error was charged twice for its honesty, wrote half as often
+  # as the frozen table, and lost. Measured over three seeds, removing it
+  # moves the agentic method from -0.0049 to +0.0088 wIF against
+  # INTACT-RA without changing either method's safety-crossing count.
+  lambda_risk: 0.0
+  lambda_churn: 0.0
+  action_cost: 0.0003           # small preference for fewer writes
+  protect_only_safe: true       # protect intents currently keeping the promise
+  max_enumerate_claims: 14
+  abstain_on_unknown: false
+  unknown_impact_threshold: 0.02
+  greedy_fallback: true
+  # None of B3, INTACT-RA or INTACT-RA-Agentic uses contract weights in
+  # its decision (INTACT-RA was frozen as "INTACT-RA-lean, no contract
+  # weights").  pi_class survives only as a reporting field for the legacy
+  # wIF, which is kept for comparability but is no longer primary.
+  use_intent_weights: false
+  sigma_min: 0.0005
+
+  # 'linear'    maximise sum_i w_i * predicted margin gain (original)
+  # 'threshold' maximise the expected change in weighted intent
+  #             FULFILMENT, which is what wIF actually measures.
+  # Applied identically to every method in the registry.
+  c2_cell_pool: false          # true: C2 also requires reservations to fit
+                                #   the physical PRB pool (finite resources)
+  pool_transfers: false        # true: raises in a portfolio are resized so
+                                #   its own releases fund them (all mediated
+                                #   methods alike; B0 bypasses the arbiter)
+  objective: linear            # 'threshold' tested and REJECTED: see FINDINGS.md
+  prob_sigma_floor: 0.03        # probit width near the threshold
+  tie_break: 0.05               # small linear term to break flat ties
+
+  # regime space
+  regime_load_edges: [0.90, 1.25]      # bands on the offered-load ratio
+  # Bands on resource pressure rho = demand / effective capacity, measured
+  # by scripts/calibrate.py so that they line up with the 0.70 / 1.00 / 1.35
+  # load scales the offline sweep used for its three table columns.
+  regime_pressure_edges: [0.412, 0.568]
+  regime_coverage_edge: 0.35
+  channel_aware_regime: false    # methods that use the channel axis set this
+
+# ---------------------------------------------------------------------------
+calibration:
+  base_seed: 101
+  sweep_points: 7
+  replicates: 6
+  settle_slots: 32
+  measure_slots: 48
+  sweep_load_scales: [0.70, 1.00, 1.35]
+  cache: artifacts/sensitivity_prior.json
+
+# ---------------------------------------------------------------------------
+agent:
+  # ---- online cross-sensitivity (recursive least squares) ----
+  sensitivity:
+    unknown_sigma: 0.05         # missing entry => REFUSE, not "slope 0"
+    forgetting: 0.985
+    prior_ridge: 12.0
+    p0: 0.01                    # prior variance on a slope, not 1.0:
+                                #   slopes here are of order 0.01 to 0.2
+    max_sigma: 0.25
+    promote_min_obs: 6
+    promote_min_improvement: 0.02
+    holdout_epochs: 6
+    backoff_sigma_mult: 1.6     # a refined regime backs off to its parent,
+    backoff_sigma_add: 0.004    #   usable but explicitly less trustworthy
+    stale_resid_mult: 2.5
+    stale_window: 12
+    dose_scale:                 # put every knob's dose on a comparable scale
+      txpower: 1.0
+      tilt: 1.0
+      quota_T1: 1.0
+      quota_T2: 1.0
+      quota_T3: 1.0
+      schedw_T1: 10.0
+      schedw_T2: 10.0
+      mcs_T3: 1.0
+
+  # ---- GCN context head: predicts resource pressure and coverage index ----
+  context:
+    hidden: 24
+    embed: 12
+    lr: 3.0e-3
+    warmup_epochs: 20
+    buffer: 240
+    batch: 16
+    updates_per_epoch: 2
+    huber_delta: 0.5
+    confidence_scale: 0.25
+    max_sessions_per_slice: 24
+    rho_proxy_scale: 1.0        # cold-start proxy -> true pressure; neutral
+    rho_proxy_offset: 0.0       #   since the proxy now uses reserved capacity
+
+  # ---- claim-aware PPO candidate policy ----
+  policy:
+    hidden: 32
+    embed: 12
+    top_k: 6
+    lr: 1.0e-3
+    clip_eps: 0.2
+    gamma: 0.90
+    gae_lambda: 0.95
+    epochs_per_update: 4
+    batch: 32
+    buffer: 256
+    entropy_coef: 0.01
+    value_coef: 0.5
+    warmup_epochs: 40
+    latency_cost: 0.02
+    regret_scale: 0.02
+    outcome_gain: 1.0
+    explore_logit_noise: 0.15
+    max_sessions_per_slice: 24
+
+  # ---- Kalman sensitivity tracker (INTACT-RA-Agentic) ----
+  kalman:
+    structural_kappa: 0.5       # offline slope valid to +/-50% off its
+                                #   calibration operating point
+    sigma_floor: 0.002
+    process_q: 0.05             # per-epoch random-walk drift, x sigma0
+    change_threshold: 4.0       # normalised-innovation EWMA that widens C
+    change_ewma: 0.2
+    noise_ewma: 0.05            # plant-noise variance from no-write epochs
+    noise_floor: 0.0001
+    analytic_prior: false       # physics-informed own-tenant served-ratio
+                                #   prior (see KalmanSensitivity)
+
+  # ---- digital-twin calibration loop (INTACT-RA-Agentic) ----
+  twin:
+    enabled: false
+    every_eval: 1               # epochs between twin calibrations (scored)
+    every_burn_in: 5            #   ... and during the unscored burn-in
+    replicates: 2
+    settle_slots: 8
+    measure_slots: 24
+    probe_frac: 0.5
+    pos_sigma_m: 25.0           # UE position estimation error (per axis)
+    nf_err_sd_db: 1.0           # noise-figure model error, drawn once/run
+    load_err_sd: 0.2            # neighbour-load model error (log-normal)
+    variance_inflation: 4.0     # distrust of twin measurements vs replicates
+
+  # ---- agentic supervisor ----
+  supervisor:
+    enabled: true
+    interval_epochs: 5
+    probe_budget_per_100: 15.0
+    probe_dose_frac: 0.35
+    max_probes_per_epoch: 1
+    min_probe_gap_epochs: 3
+    risk_eps: 0.01
+    relevance_window: 20
+    rollback_window: 15
+    escalate_on_unknown: true
+
+# ---------------------------------------------------------------------------
+oracle:
+  refresh_every: 10
+  refresh_every_eval: 0       # >0: during evaluation refresh this often,
+                              #   only for knobs with a proposal
+  replicates: 6               # GENUINE replicates (plant.reseed); see FINDINGS
+  rollout_top_m: 6            # Oracle-R: candidates simulated per epoch
+  rollout_reps: 2             # independent futures per candidate
+  rollout_horizon_epochs: 2   # horizon over which a choice is judged
+  settle_slots: 16
+  measure_slots: 48
+  probe_frac: 0.5
+
+# ---------------------------------------------------------------------------
+report:
+  telemetry:
+    enabled: true
+    ue_every_slots: 8
+    slice_every_slots: 1
+    max_ue_rows: 400000
+  figures: true
+  dpi: 160
+
+# ---------------------------------------------------------------------------
+# Scenario-validity gates.  validate_scenarios.py REFUSES a scenario that
+# fails any of these, before a single benchmark epoch is run.
+gates:
+  enabled: true
+  control_gain_min: 0.030       # G7: best controller - all-reject  (wIF)
+  conflict_gain_min: 0.030      # G8: best controller - all-accept  (wIF)
+  drift_materiality_min: 2.0    # true |slope| ratio, late vs early window
+  regime_disagreement_min: 0.20 # per-tenant vs cell-average label mismatch
+  agentic_gain_min: 0.010       # agentic - INTACT-RA (wIF)
+  max_safety_crossings_best: 1000
+  probe_epochs: 220             # short screening run length

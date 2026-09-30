@@ -1,0 +1,27 @@
+# ===========================================================================
+# S0 -- Stationary control
+# ===========================================================================
+# No drift.  The offline table stays valid for the whole run.
+#
+# This scenario is expected to FAIL the drift-materiality gate, and it is
+# kept deliberately: it is the negative control that shows the agentic
+# method's advantage in S1 comes from adaptation and not from the extra
+# machinery being generically better.  Here an online estimator should be
+# at best neutral, because it replaces a tight offline standard error with
+# a noisier in-run one and the arbiter converts uncertainty into inaction.
+# Reporting that cost honestly is part of the claim.
+
+_scenario_note: >
+  Negative control. No drift, so the frozen table never goes stale and
+  online estimation has nothing to buy.
+
+run:
+  epochs: 800
+
+ran:
+  mobility:
+    mode: rwp
+    drift: {tenants: [], rate_m_per_slot: 0.0}
+
+gates:
+  drift_materiality_min: 0.0      # this scenario is MEANT to be immaterial

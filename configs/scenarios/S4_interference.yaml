@@ -1,0 +1,37 @@
+# ===========================================================================
+# S4 -- Neighbour-cell interference ramp
+# ===========================================================================
+# The six neighbour sites raise their load and their transmit power, so the
+# interference floor rises for everyone at once. Nothing the RIC controls
+# has changed, and no tenant has moved.
+#
+# This is a stress case for the CHANNEL axis of the regime space. Every
+# tenant becomes more coverage-limited at the same time, so per-tenant
+# LOAD labels all stay put while the true slopes on txpower and tilt all
+# shift together. A cell-average channel label would be adequate here,
+# which is why the intact-ra-cell ablation is worth running on S4: it
+# checks that the per-tenant machinery is not being credited for something
+# a much simpler estimator would also have caught.
+
+_scenario_note: >
+  Rising neighbour-cell interference with static geometry and load.
+  Every tenant becomes coverage-limited simultaneously.
+
+run:
+  epochs: 800
+
+ran:
+  mobility:
+    mode: rwp
+    drift: {tenants: [], rate_m_per_slot: 0.0}
+  initial_controls:
+    tilt: 8.0
+  channel:
+    isd_m: 520.0
+    neighbour_tx_dbm: 44.0
+    neighbour_load: 0.90
+
+gates:
+  drift_materiality_min: 1.6
+  regime_disagreement_min: 0.05   # labels move TOGETHER here, by design
+  agentic_gain_min: 0.000
