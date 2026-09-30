@@ -4,6 +4,10 @@ This runbook contains every command needed to reproduce the paper's results, in 
 it. The design and reasoning behind each step are in `README.md`; this
 document is only about what to do.
 
+**Important Legen Note:**
+S16: Inward-migration scenario (IMS). T1's users walk from the cell edge toward the site at constant load. This is exactly what we mentioned in the paper.
+S19: Outward-drift scenario (ODS). T2's users drift from near the site toward the cell edge at constant load. This is exactly what we mentioned in the paper.
+
 **Every step is marked:**
 
 - **[AUTO]** — a script does all of it. You run one command and read the
