@@ -1,0 +1,16 @@
+{
+  "scenario": "S19_persistent_drift",
+  "fingerprint": "1bf519262dc6db9f",
+  "code_fingerprint": "4f340fdf1fe8a537",
+  "seeds": [
+    20260925
+  ],
+  "dev_seeds": [
+    0
+  ],
+  "methods": [
+    "intact-ra-agentic",
+    "oracle"
+  ],
+  "frozen_at": "2026-09-28 11:45:04"
+}

@@ -1,0 +1,935 @@
+[
+  {
+    "detail": "2 (regime, intent) cells flagged stale",
+    "epoch": 20,
+    "kind": "staleness"
+  },
+  {
+    "delta": 1.75,
+    "detail": "quota_T1b +1.750 for i2 (stale entry)",
+    "epoch": 21,
+    "kind": "probe",
+    "param": "quota_T1b",
+    "reason": "stale entry",
+    "risk": 0.0004808637596792932,
+    "target_intent": "i2",
+    "voi": 3.255191440947459
+  },
+  {
+    "delta": 1.75,
+    "detail": "quota_T1b +1.750 for i5 (stale entry)",
+    "epoch": 24,
+    "kind": "probe",
+    "param": "quota_T1b",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i5",
+    "voi": 0.16118748276496758
+  },
+  {
+    "detail": "3 (regime, intent) cells flagged stale",
+    "epoch": 25,
+    "kind": "staleness"
+  },
+  {
+    "delta": 2.38,
+    "detail": "quota_T1 +2.380 for i2 (stale entry)",
+    "epoch": 27,
+    "kind": "probe",
+    "param": "quota_T1",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i2",
+    "voi": 1.593886848616896
+  },
+  {
+    "delta": 1.75,
+    "detail": "quota_T1b +1.750 for i2 (stale entry)",
+    "epoch": 30,
+    "kind": "probe",
+    "param": "quota_T1b",
+    "reason": "stale entry",
+    "risk": 0.0005117368232927071,
+    "target_intent": "i2",
+    "voi": 2.7790996639997303
+  },
+  {
+    "detail": "3 (regime, intent) cells flagged stale",
+    "epoch": 30,
+    "kind": "staleness"
+  },
+  {
+    "delta": 1.75,
+    "detail": "quota_T1b +1.750 for i2 (stale entry)",
+    "epoch": 35,
+    "kind": "probe",
+    "param": "quota_T1b",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i2",
+    "voi": 0.08961728428644002
+  },
+  {
+    "detail": "3 (regime, intent) cells flagged stale",
+    "epoch": 35,
+    "kind": "staleness"
+  },
+  {
+    "delta": 1.75,
+    "detail": "quota_T1b +1.750 for i2 (stale entry)",
+    "epoch": 43,
+    "kind": "probe",
+    "param": "quota_T1b",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i2",
+    "voi": 0.06843721209059879
+  },
+  {
+    "detail": "3 (regime, intent) cells flagged stale",
+    "epoch": 45,
+    "kind": "staleness"
+  },
+  {
+    "delta": 2.38,
+    "detail": "quota_T1 +2.380 for i2 (stale entry)",
+    "epoch": 46,
+    "kind": "probe",
+    "param": "quota_T1",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i2",
+    "voi": 0.016013219156276706
+  },
+  {
+    "delta": 1.75,
+    "detail": "quota_T1b +1.750 for i6 (stale entry)",
+    "epoch": 49,
+    "kind": "probe",
+    "param": "quota_T1b",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i6",
+    "voi": 0.1365943894665963
+  },
+  {
+    "delta": 2.6599999999999997,
+    "detail": "quota_T3 +2.660 for i5 (stale entry)",
+    "epoch": 54,
+    "kind": "probe",
+    "param": "quota_T3",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i5",
+    "voi": 0.12187190334409781
+  },
+  {
+    "detail": "3 (regime, intent) cells flagged stale",
+    "epoch": 55,
+    "kind": "staleness"
+  },
+  {
+    "detail": "3 (regime, intent) cells flagged stale",
+    "epoch": 60,
+    "kind": "staleness"
+  },
+  {
+    "delta": 2.8,
+    "detail": "quota_T2b +2.800 for i5 (stale entry)",
+    "epoch": 61,
+    "kind": "probe",
+    "param": "quota_T2b",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i5",
+    "voi": 0.06618282680388916
+  },
+  {
+    "detail": "3 (regime, intent) cells flagged stale",
+    "epoch": 65,
+    "kind": "staleness"
+  },
+  {
+    "delta": 1.75,
+    "detail": "quota_T1b +1.750 for i2 (stale entry)",
+    "epoch": 67,
+    "kind": "probe",
+    "param": "quota_T1b",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i2",
+    "voi": 0.23684364445906578
+  },
+  {
+    "detail": "3 (regime, intent) cells flagged stale",
+    "epoch": 70,
+    "kind": "staleness"
+  },
+  {
+    "delta": 1.75,
+    "detail": "quota_T1b +1.750 for i2 (stale entry)",
+    "epoch": 82,
+    "kind": "probe",
+    "param": "quota_T1b",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i2",
+    "voi": 0.24582327624972067
+  },
+  {
+    "delta": 1.75,
+    "detail": "quota_T1b +1.750 for i2 (stale entry)",
+    "epoch": 85,
+    "kind": "probe",
+    "param": "quota_T1b",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i2",
+    "voi": 0.24341493655459503
+  },
+  {
+    "detail": "3 (regime, intent) cells flagged stale",
+    "epoch": 85,
+    "kind": "staleness"
+  },
+  {
+    "delta": 1.75,
+    "detail": "quota_T1b +1.750 for i2 (stale entry)",
+    "epoch": 98,
+    "kind": "probe",
+    "param": "quota_T1b",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i2",
+    "voi": 0.2857612355886175
+  },
+  {
+    "detail": "4 (regime, intent) cells flagged stale",
+    "epoch": 100,
+    "kind": "staleness"
+  },
+  {
+    "delta": 2.6599999999999997,
+    "detail": "quota_T3 +2.660 for i6 (stale entry)",
+    "epoch": 103,
+    "kind": "probe",
+    "param": "quota_T3",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i6",
+    "voi": 0.0020124125594020337
+  },
+  {
+    "detail": "2 (regime, intent) cells flagged stale",
+    "epoch": 105,
+    "kind": "staleness"
+  },
+  {
+    "detail": "2 (regime, intent) cells flagged stale",
+    "epoch": 125,
+    "kind": "staleness"
+  },
+  {
+    "delta": 2.38,
+    "detail": "quota_T1 +2.380 for i2 (stale entry)",
+    "epoch": 136,
+    "kind": "probe",
+    "param": "quota_T1",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i2",
+    "voi": 0.0037463893075278887
+  },
+  {
+    "delta": 1.75,
+    "detail": "quota_T1b +1.750 for i2 (stale entry)",
+    "epoch": 141,
+    "kind": "probe",
+    "param": "quota_T1b",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i2",
+    "voi": 0.06948521700940297
+  },
+  {
+    "delta": 1.75,
+    "detail": "quota_T1b +1.750 for i2 (stale entry)",
+    "epoch": 144,
+    "kind": "probe",
+    "param": "quota_T1b",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i2",
+    "voi": 0.11835530026391358
+  },
+  {
+    "detail": "3 (regime, intent) cells flagged stale",
+    "epoch": 145,
+    "kind": "staleness"
+  },
+  {
+    "delta": 1.75,
+    "detail": "quota_T1b +1.750 for i2 (stale entry)",
+    "epoch": 148,
+    "kind": "probe",
+    "param": "quota_T1b",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i2",
+    "voi": 0.16226948476199074
+  },
+  {
+    "delta": 1.75,
+    "detail": "quota_T1b +1.750 for i2 (stale entry)",
+    "epoch": 154,
+    "kind": "probe",
+    "param": "quota_T1b",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i2",
+    "voi": 0.1596696685620947
+  },
+  {
+    "delta": 1.75,
+    "detail": "quota_T1b +1.750 for i2 (stale entry)",
+    "epoch": 161,
+    "kind": "probe",
+    "param": "quota_T1b",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i2",
+    "voi": 0.135385842880479
+  },
+  {
+    "delta": 1.75,
+    "detail": "quota_T1b +1.750 for i2 (stale entry)",
+    "epoch": 167,
+    "kind": "probe",
+    "param": "quota_T1b",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i2",
+    "voi": 0.10278176148956325
+  },
+  {
+    "delta": -2.6599999999999997,
+    "detail": "quota_T3 -2.660 for i6 (stale entry)",
+    "epoch": 170,
+    "kind": "probe",
+    "param": "quota_T3",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i6",
+    "voi": 0.016397182508531886
+  },
+  {
+    "detail": "1 (regime, intent) cells flagged stale",
+    "epoch": 170,
+    "kind": "staleness"
+  },
+  {
+    "delta": 2.38,
+    "detail": "quota_T1 +2.380 for i2 (stale entry)",
+    "epoch": 175,
+    "kind": "probe",
+    "param": "quota_T1",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i2",
+    "voi": 0.008762421199028435
+  },
+  {
+    "detail": "2 (regime, intent) cells flagged stale",
+    "epoch": 175,
+    "kind": "staleness"
+  },
+  {
+    "delta": 1.75,
+    "detail": "quota_T1b +1.750 for i2 (stale entry)",
+    "epoch": 183,
+    "kind": "probe",
+    "param": "quota_T1b",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i2",
+    "voi": 0.09842613470910583
+  },
+  {
+    "detail": "3 (regime, intent) cells flagged stale",
+    "epoch": 185,
+    "kind": "staleness"
+  },
+  {
+    "delta": 1.75,
+    "detail": "quota_T1b +1.750 for i2 (stale entry)",
+    "epoch": 188,
+    "kind": "probe",
+    "param": "quota_T1b",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i2",
+    "voi": 0.14521527644681886
+  },
+  {
+    "detail": "3 (regime, intent) cells flagged stale",
+    "epoch": 190,
+    "kind": "staleness"
+  },
+  {
+    "delta": 1.75,
+    "detail": "quota_T1b +1.750 for i2 (stale entry)",
+    "epoch": 194,
+    "kind": "probe",
+    "param": "quota_T1b",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i2",
+    "voi": 0.07798531697787826
+  },
+  {
+    "detail": "3 (regime, intent) cells flagged stale",
+    "epoch": 195,
+    "kind": "staleness"
+  },
+  {
+    "delta": 1.75,
+    "detail": "quota_T1b +1.750 for i2 (stale entry)",
+    "epoch": 198,
+    "kind": "probe",
+    "param": "quota_T1b",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i2",
+    "voi": 0.04798056708151992
+  },
+  {
+    "delta": 2.38,
+    "detail": "quota_T1 +2.380 for i2 (stale entry)",
+    "epoch": 208,
+    "kind": "probe",
+    "param": "quota_T1",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i2",
+    "voi": 0.007233506143386813
+  },
+  {
+    "delta": 1.75,
+    "detail": "quota_T1b +1.750 for i2 (stale entry)",
+    "epoch": 211,
+    "kind": "probe",
+    "param": "quota_T1b",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i2",
+    "voi": 0.011565192951484511
+  },
+  {
+    "delta": 1.75,
+    "detail": "quota_T1b +1.750 for i2 (stale entry)",
+    "epoch": 215,
+    "kind": "probe",
+    "param": "quota_T1b",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i2",
+    "voi": 0.022432689846110177
+  },
+  {
+    "detail": "3 (regime, intent) cells flagged stale",
+    "epoch": 215,
+    "kind": "staleness"
+  },
+  {
+    "delta": 2.38,
+    "detail": "quota_T1 +2.380 for i2 (stale entry)",
+    "epoch": 219,
+    "kind": "probe",
+    "param": "quota_T1",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i2",
+    "voi": 0.005644904728972315
+  },
+  {
+    "detail": "2 (regime, intent) cells flagged stale",
+    "epoch": 220,
+    "kind": "staleness"
+  },
+  {
+    "detail": "2 (regime, intent) cells flagged stale",
+    "epoch": 225,
+    "kind": "staleness"
+  },
+  {
+    "delta": 2.6599999999999997,
+    "detail": "quota_T3 +2.660 for i6 (stale entry)",
+    "epoch": 228,
+    "kind": "probe",
+    "param": "quota_T3",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i6",
+    "voi": 0.06683745260444507
+  },
+  {
+    "detail": "1 (regime, intent) cells flagged stale",
+    "epoch": 230,
+    "kind": "staleness"
+  },
+  {
+    "delta": 2.6599999999999997,
+    "detail": "quota_T3 +2.660 for i6 (stale entry)",
+    "epoch": 231,
+    "kind": "probe",
+    "param": "quota_T3",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i6",
+    "voi": 0.06611719521923776
+  },
+  {
+    "delta": 2.6599999999999997,
+    "detail": "quota_T3 +2.660 for i6 (stale entry)",
+    "epoch": 234,
+    "kind": "probe",
+    "param": "quota_T3",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i6",
+    "voi": 0.061279487950511774
+  },
+  {
+    "detail": "1 (regime, intent) cells flagged stale",
+    "epoch": 235,
+    "kind": "staleness"
+  },
+  {
+    "delta": 2.6599999999999997,
+    "detail": "quota_T3 +2.660 for i6 (stale entry)",
+    "epoch": 237,
+    "kind": "probe",
+    "param": "quota_T3",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i6",
+    "voi": 0.06100632613209761
+  },
+  {
+    "detail": "1 (regime, intent) cells flagged stale",
+    "epoch": 240,
+    "kind": "staleness"
+  },
+  {
+    "delta": -2.6599999999999997,
+    "detail": "quota_T3 -2.660 for i6 (stale entry)",
+    "epoch": 241,
+    "kind": "probe",
+    "param": "quota_T3",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i6",
+    "voi": 0.05455177103983886
+  },
+  {
+    "detail": "1 (regime, intent) cells flagged stale",
+    "epoch": 245,
+    "kind": "staleness"
+  },
+  {
+    "delta": -2.6599999999999997,
+    "detail": "quota_T3 -2.660 for i6 (stale entry)",
+    "epoch": 247,
+    "kind": "probe",
+    "param": "quota_T3",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i6",
+    "voi": 0.04886745908963857
+  },
+  {
+    "detail": "1 (regime, intent) cells flagged stale",
+    "epoch": 250,
+    "kind": "staleness"
+  },
+  {
+    "delta": -2.6599999999999997,
+    "detail": "quota_T3 -2.660 for i6 (stale entry)",
+    "epoch": 254,
+    "kind": "probe",
+    "param": "quota_T3",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i6",
+    "voi": 0.03378628811463153
+  },
+  {
+    "detail": "2 (regime, intent) cells flagged stale",
+    "epoch": 255,
+    "kind": "staleness"
+  },
+  {
+    "detail": "2 (regime, intent) cells flagged stale",
+    "epoch": 290,
+    "kind": "staleness"
+  },
+  {
+    "detail": "2 (regime, intent) cells flagged stale",
+    "epoch": 295,
+    "kind": "staleness"
+  },
+  {
+    "detail": "2 (regime, intent) cells flagged stale",
+    "epoch": 300,
+    "kind": "staleness"
+  },
+  {
+    "delta": 1.75,
+    "detail": "quota_T1b +1.750 for i4 (stale entry)",
+    "epoch": 353,
+    "kind": "probe",
+    "param": "quota_T1b",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i4",
+    "voi": 0.9812142406478255
+  },
+  {
+    "detail": "1 (regime, intent) cells flagged stale",
+    "epoch": 355,
+    "kind": "staleness"
+  },
+  {
+    "delta": -2.8,
+    "detail": "quota_T2b -2.800 for i4 (stale entry)",
+    "epoch": 356,
+    "kind": "probe",
+    "param": "quota_T2b",
+    "reason": "stale entry",
+    "risk": 0.0008842173545520263,
+    "target_intent": "i4",
+    "voi": 0.7702926324310166
+  },
+  {
+    "delta": 1.75,
+    "detail": "quota_T1b +1.750 for i4 (stale entry)",
+    "epoch": 359,
+    "kind": "probe",
+    "param": "quota_T1b",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i4",
+    "voi": 0.05309153419194456
+  },
+  {
+    "detail": "1 (regime, intent) cells flagged stale",
+    "epoch": 360,
+    "kind": "staleness"
+  },
+  {
+    "delta": 2.38,
+    "detail": "quota_T2 +2.380 for i4 (stale entry)",
+    "epoch": 362,
+    "kind": "probe",
+    "param": "quota_T2",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i4",
+    "voi": 0.04744374265491818
+  },
+  {
+    "delta": -2.8,
+    "detail": "quota_T2b -2.800 for i2 (stale entry)",
+    "epoch": 365,
+    "kind": "probe",
+    "param": "quota_T2b",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i2",
+    "voi": 1.7959667655246137
+  },
+  {
+    "detail": "2 (regime, intent) cells flagged stale",
+    "epoch": 365,
+    "kind": "staleness"
+  },
+  {
+    "delta": -2.8,
+    "detail": "quota_T2b -2.800 for i2 (stale entry)",
+    "epoch": 368,
+    "kind": "probe",
+    "param": "quota_T2b",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i2",
+    "voi": 0.06346424147813352
+  },
+  {
+    "detail": "2 (regime, intent) cells flagged stale",
+    "epoch": 370,
+    "kind": "staleness"
+  },
+  {
+    "delta": 1.75,
+    "detail": "quota_T1b +1.750 for i2 (stale entry)",
+    "epoch": 371,
+    "kind": "probe",
+    "param": "quota_T1b",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i2",
+    "voi": 0.10722535944053802
+  },
+  {
+    "delta": -2.8,
+    "detail": "quota_T2b -2.800 for i2 (stale entry)",
+    "epoch": 374,
+    "kind": "probe",
+    "param": "quota_T2b",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i2",
+    "voi": 0.10028284111450535
+  },
+  {
+    "detail": "3 (regime, intent) cells flagged stale",
+    "epoch": 375,
+    "kind": "staleness"
+  },
+  {
+    "delta": 2.38,
+    "detail": "quota_T2 +2.380 for i4 (stale entry)",
+    "epoch": 377,
+    "kind": "probe",
+    "param": "quota_T2",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i4",
+    "voi": 0.029083640732554383
+  },
+  {
+    "delta": -2.8,
+    "detail": "quota_T2b -2.800 for i2 (stale entry)",
+    "epoch": 380,
+    "kind": "probe",
+    "param": "quota_T2b",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i2",
+    "voi": 0.07183921667507596
+  },
+  {
+    "detail": "3 (regime, intent) cells flagged stale",
+    "epoch": 380,
+    "kind": "staleness"
+  },
+  {
+    "delta": -2.8,
+    "detail": "quota_T2b -2.800 for i4 (stale entry)",
+    "epoch": 383,
+    "kind": "probe",
+    "param": "quota_T2b",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i4",
+    "voi": 0.05214303886969146
+  },
+  {
+    "detail": "3 (regime, intent) cells flagged stale",
+    "epoch": 385,
+    "kind": "staleness"
+  },
+  {
+    "delta": -2.8,
+    "detail": "quota_T2b -2.800 for i4 (stale entry)",
+    "epoch": 386,
+    "kind": "probe",
+    "param": "quota_T2b",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i4",
+    "voi": 0.06120778930906301
+  },
+  {
+    "delta": -2.8,
+    "detail": "quota_T2b -2.800 for i4 (stale entry)",
+    "epoch": 389,
+    "kind": "probe",
+    "param": "quota_T2b",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i4",
+    "voi": 0.0690980945347494
+  },
+  {
+    "detail": "4 (regime, intent) cells flagged stale",
+    "epoch": 390,
+    "kind": "staleness"
+  },
+  {
+    "delta": 1.75,
+    "detail": "quota_T1b +1.750 for i2 (stale entry)",
+    "epoch": 392,
+    "kind": "probe",
+    "param": "quota_T1b",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i2",
+    "voi": 0.06774212442174851
+  },
+  {
+    "delta": 1.75,
+    "detail": "quota_T1b +1.750 for i2 (stale entry)",
+    "epoch": 395,
+    "kind": "probe",
+    "param": "quota_T1b",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i2",
+    "voi": 0.13439330175616257
+  },
+  {
+    "detail": "3 (regime, intent) cells flagged stale",
+    "epoch": 395,
+    "kind": "staleness"
+  },
+  {
+    "delta": 1.75,
+    "detail": "quota_T1b +1.750 for i2 (stale entry)",
+    "epoch": 398,
+    "kind": "probe",
+    "param": "quota_T1b",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i2",
+    "voi": 0.17583470583276908
+  },
+  {
+    "detail": "1 (regime, intent) cells flagged stale",
+    "epoch": 400,
+    "kind": "staleness"
+  },
+  {
+    "delta": -2.6599999999999997,
+    "detail": "quota_T3 -2.660 for i5 (stale entry)",
+    "epoch": 401,
+    "kind": "probe",
+    "param": "quota_T3",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i5",
+    "voi": 0.012246839709916465
+  },
+  {
+    "detail": "1 (regime, intent) cells flagged stale",
+    "epoch": 405,
+    "kind": "staleness"
+  },
+  {
+    "detail": "1 (regime, intent) cells flagged stale",
+    "epoch": 410,
+    "kind": "staleness"
+  },
+  {
+    "delta": 1.75,
+    "detail": "quota_T1b +1.750 for i5 (stale entry)",
+    "epoch": 412,
+    "kind": "probe",
+    "param": "quota_T1b",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i5",
+    "voi": 0.00406496055145201
+  },
+  {
+    "delta": 2.6599999999999997,
+    "detail": "quota_T3 +2.660 for i5 (stale entry)",
+    "epoch": 415,
+    "kind": "probe",
+    "param": "quota_T3",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i5",
+    "voi": 0.004069269321901906
+  },
+  {
+    "detail": "1 (regime, intent) cells flagged stale",
+    "epoch": 415,
+    "kind": "staleness"
+  },
+  {
+    "delta": 2.6599999999999997,
+    "detail": "quota_T3 +2.660 for i5 (stale entry)",
+    "epoch": 418,
+    "kind": "probe",
+    "param": "quota_T3",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i5",
+    "voi": 0.0049264667501523925
+  },
+  {
+    "delta": 2.38,
+    "detail": "quota_T2 +2.380 for i3 (stale entry)",
+    "epoch": 477,
+    "kind": "probe",
+    "param": "quota_T2",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i3",
+    "voi": 0.0708126411993489
+  },
+  {
+    "delta": 1.75,
+    "detail": "quota_T1b +1.750 for i1 (stale entry)",
+    "epoch": 480,
+    "kind": "probe",
+    "param": "quota_T1b",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i1",
+    "voi": 0.009124036585858074
+  },
+  {
+    "detail": "2 (regime, intent) cells flagged stale",
+    "epoch": 480,
+    "kind": "staleness"
+  },
+  {
+    "delta": 1.75,
+    "detail": "quota_T1b +1.750 for i1 (stale entry)",
+    "epoch": 483,
+    "kind": "probe",
+    "param": "quota_T1b",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i1",
+    "voi": 0.011625429929684234
+  },
+  {
+    "detail": "1 (regime, intent) cells flagged stale",
+    "epoch": 485,
+    "kind": "staleness"
+  },
+  {
+    "delta": 1.75,
+    "detail": "quota_T1b +1.750 for i1 (stale entry)",
+    "epoch": 486,
+    "kind": "probe",
+    "param": "quota_T1b",
+    "reason": "stale entry",
+    "risk": 0.0,
+    "target_intent": "i1",
+    "voi": 0.012295571103756103
+  },
+  {
+    "detail": "2 (regime, intent) cells flagged stale",
+    "epoch": 490,
+    "kind": "staleness"
+  },
+  {
+    "detail": "2 (regime, intent) cells flagged stale",
+    "epoch": 495,
+    "kind": "staleness"
+  }
+]
