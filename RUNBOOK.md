@@ -6,7 +6,10 @@ document is only about what to do.
 
 **Important Legen Note:**
 S16: Inward-migration scenario (IMS). T1's users walk from the cell edge toward the site at constant load. This is exactly what we mentioned in the paper.
+
 S19: Outward-drift scenario (ODS). T2's users drift from near the site toward the cell edge at constant load. This is exactly what we mentioned in the paper.
+
+INTACT-RA-Agentic: This was our initial short name for the proposed method. Now we call it "Agentic-INTACT". This is exactly what we used in the paper.
 
 **Every step is marked:**
 
@@ -149,7 +152,7 @@ with an explicit **CASE A / CASE B** verdict.
 **How to read it:**
 
 - **CASE A** (oracle − frozen INTACT-RA below 0.03): current sensitivities
-  are not decision-relevant in this scenario. **Do not tune the agent
+  are not -relevant in this scenario. **Do not tune the agent
   against it** — there is nothing to win, and any gain found would be
   manufactured. Go back to Step 2.
 - **CASE B**: perfect current knowledge is worth something, and improving
@@ -261,7 +264,7 @@ result was seen, and the script never converts a failure into a pass.
 | 5 | Agentic versus the real B3 (reported) |
 | 6a / 6b | control is necessary; indiscriminate intervention is harmful |
 | 7 | mediated methods have zero C1/C2 violations; causal crossings shown |
-| 8 | decision latency within the near-RT budget; twin compute separate |
+| 8 |  latency within the near-RT budget; twin compute separate |
 
 ---
 
@@ -331,12 +334,10 @@ seeds). If R2 fails, the two plants do not favour different frozen
 configurations and cannot test the claim at all — report S16 on its own
 terms instead.
 
-**Known before you run it [MANUAL — read this]:** S18's floor/ceiling gap
-was measured at **+0.162**, below the +0.20 validity threshold, so **R1 is
-expected to fail** unless you accept that deviation. The script will not
+**before you run it:** S18's floor/ceiling gap was measured at **+0.162**, below the +0.20 validity threshold, so **R1 is
+expected to fail** unless we accept that deviation. The script will not
 relax the threshold for you. S18 still has a high ceiling (0.909) and every
-intent is attainable; whether a +0.16 gap is acceptable is your decision,
-and it must be stated if you report the result.
+intent is attainable; whether a +0.16 gap is acceptable a design choice.
 
 ## Step 8c — The factor walk  [AUTO]  ~10 min per variant per seed
 
