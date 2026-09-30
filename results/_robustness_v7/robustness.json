@@ -1,0 +1,28 @@
+{
+  "verdict": {
+    "R1": true,
+    "R2": true,
+    "R3": true,
+    "R4": true
+  },
+  "preflight": {
+    "S16_high_ceiling": {
+      "floor": 0.7236111111111111,
+      "ceiling": 0.9145833333333333,
+      "gap": 0.1909722222222222,
+      "attainable": true,
+      "valid": true
+    },
+    "S19_persistent_drift": {
+      "floor": 0.7094444444444444,
+      "ceiling": 0.8512500000000002,
+      "gap": 0.14180555555555574,
+      "attainable": true,
+      "valid": true
+    }
+  },
+  "best_frozen": {
+    "S16_high_ceiling": "intact-ra-cell",
+    "S19_persistent_drift": "intact-ra-pertenant-sweep"
+  }
+}
