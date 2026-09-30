@@ -1,3 +1,15 @@
+# Agentic-INTACT: Agentic Sensitivity Tracking for Multi-Tenant xApp Conflict Mediation in the O-RAN Near-RT RIC
+
+**Authors:**
+
+Md. Kamrul Hossain, Walid Aljoby
+
+Md. Kamrul Hossain is with Information and Computer Science Department, King Fahd University of Petroleum and Minerals, Dhahran 31261, Saudi Arabia.
+
+Walid Aljoby is with Information and Computer Science Department, and IRC for Intelligent Secure Systems, King Fahd University of Petroleum and Minerals, Dhahran 31261, Saudi Arabia.
+
+**This work has been submitted for review in JSAC special issue "Agentic AI for Intelligent Networks".**
+
 # Agentic-INTACT
 
 Multi-tenant xApp conflict mediation for the O-RAN near-real-time RIC, with
