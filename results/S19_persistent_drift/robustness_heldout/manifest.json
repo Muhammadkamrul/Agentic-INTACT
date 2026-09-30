@@ -1,0 +1,28 @@
+{
+  "scenario": "S19_persistent_drift",
+  "fingerprint": "1bf519262dc6db9f",
+  "code_fingerprint": "4f340fdf1fe8a537",
+  "seeds": [
+    31001,
+    31002,
+    31003,
+    31004,
+    31005
+  ],
+  "dev_seeds": [
+    20260925,
+    20260926,
+    20260927
+  ],
+  "methods": [
+    "all-reject",
+    "all-accept",
+    "b3",
+    "intact-ra",
+    "intact-ra-cell",
+    "intact-ra-pertenant-sweep",
+    "intact-ra-agentic",
+    "oracle"
+  ],
+  "frozen_at": "2026-09-28 12:54:48"
+}
