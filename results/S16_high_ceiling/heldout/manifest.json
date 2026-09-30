@@ -1,0 +1,34 @@
+{
+  "scenario": "S16_high_ceiling",
+  "fingerprint": "0a3a7f0ab28a2e80",
+  "seeds": [
+    31001,
+    31002,
+    31003,
+    31004,
+    31005
+  ],
+  "dev_seeds": [
+    20260925,
+    20260926,
+    20260927
+  ],
+  "frozen_at": "2026-09-26 14:52:53",
+  "methods": [
+    "all-reject",
+    "all-accept",
+    "b3",
+    "intact-ra",
+    "intact-ra-agentic",
+    "oracle"
+  ],
+  "migrated_from": "/tmp/heldout16.jsonl (temporary runner, same configuration)",
+  "post_freeze_corrections": [
+    {
+      "at": "2026-09-27 17:19:52",
+      "what": "supervisor probe attributed to the tenant owning its knob (C2 correctness)",
+      "replaced": "intact-ra-agentic on all 5 held-out seeds; old records in superseded.jsonl",
+      "why": "found by the write-time C2 check in an ablation run; not a tuning change"
+    }
+  ]
+}
