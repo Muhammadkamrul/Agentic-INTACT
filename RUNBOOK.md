@@ -1,6 +1,6 @@
 # RUNBOOK
 
-Every command you need, in order, with what each produces and how to read
+This runbook contains every command needed to reproduce the paper's results, in order, with what each produces and how to read
 it. The design and reasoning behind each step are in `README.md`; this
 document is only about what to do.
 
