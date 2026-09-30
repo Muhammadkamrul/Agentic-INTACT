@@ -1,0 +1,21 @@
+{
+  "scenario": "S16_high_ceiling",
+  "fingerprint": "0a3a7f0ab28a2e80",
+  "code_fingerprint": "4f340fdf1fe8a537",
+  "seeds": [
+    31001,
+    31002,
+    31003,
+    31004,
+    31005
+  ],
+  "dev_seeds": [
+    20260925,
+    20260926,
+    20260927
+  ],
+  "methods": [
+    "agentic-lean"
+  ],
+  "frozen_at": "2026-09-28 10:59:37"
+}
