@@ -1,0 +1,90 @@
+{
+  "intact-ra": [
+    {
+      "seed": 31001,
+      "IF": 0.7204166666666666,
+      "epochs": 400,
+      "write_epochs": 178,
+      "helpful": 0,
+      "harmful": 10,
+      "neutral": 168,
+      "net_causal_IF": -0.004583333333333333,
+      "raises": 103,
+      "releases": 164,
+      "reserved_mean": 81.515,
+      "reserved_last100": 66.19
+    },
+    {
+      "seed": 31002,
+      "IF": 0.7141666666666667,
+      "epochs": 400,
+      "write_epochs": 252,
+      "helpful": 3,
+      "harmful": 6,
+      "neutral": 243,
+      "net_causal_IF": -0.00125,
+      "raises": 116,
+      "releases": 169,
+      "reserved_mean": 85.64,
+      "reserved_last100": 71.43
+    },
+    {
+      "seed": 31003,
+      "IF": 0.75625,
+      "epochs": 400,
+      "write_epochs": 189,
+      "helpful": 1,
+      "harmful": 2,
+      "neutral": 186,
+      "net_causal_IF": -0.0008333333333333334,
+      "raises": 101,
+      "releases": 167,
+      "reserved_mean": 86.8925,
+      "reserved_last100": 70.0
+    }
+  ],
+  "intact-ra-cell": [
+    {
+      "seed": 31001,
+      "IF": 0.8375,
+      "epochs": 400,
+      "write_epochs": 21,
+      "helpful": 0,
+      "harmful": 2,
+      "neutral": 19,
+      "net_causal_IF": -0.0008333333333333333,
+      "raises": 25,
+      "releases": 26,
+      "reserved_mean": 106.0,
+      "reserved_last100": 106.0
+    },
+    {
+      "seed": 31002,
+      "IF": 0.8045833333333334,
+      "epochs": 400,
+      "write_epochs": 18,
+      "helpful": 1,
+      "harmful": 4,
+      "neutral": 13,
+      "net_causal_IF": -0.0016666666666666666,
+      "raises": 22,
+      "releases": 20,
+      "reserved_mean": 105.995,
+      "reserved_last100": 106.0
+    },
+    {
+      "seed": 31003,
+      "IF": 0.8891666666666667,
+      "epochs": 400,
+      "write_epochs": 23,
+      "helpful": 0,
+      "harmful": 5,
+      "neutral": 18,
+      "net_causal_IF": -0.0025,
+      "raises": 27,
+      "releases": 25,
+      "reserved_mean": 105.9825,
+      "reserved_last100": 106.0
+    }
+  ]
+}
