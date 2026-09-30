@@ -1,12 +1,12 @@
-# INTACT-RA-Agentic
+# Agentic-INTACT
 
 Multi-tenant xApp conflict mediation for the O-RAN near-real-time RIC, with
 **sensitivities that stay current**.
 
-This single document describes the whole system: what it models, how every
+This document describes the whole system: what it models, how every
 controller in the comparison works, what the agent observes and when it
 acts, how results are measured, and how to read them. The companion
-`RUNBOOK.md` gives the exact commands, in order. `docs/WORKED_EXAMPLE.md`
+`RUNBOOK.md` gives the commands, in order. `docs/WORKED_EXAMPLE.md`
 walks through one real decision by hand, and `docs/METRICS.md` defines
 every metric.
 
@@ -36,20 +36,20 @@ scenario where current sensitivities genuinely matter.
 ## 2. Scope: the conditions under which the claim is made
 
 The claim is **not** that current sensitivities help in every RAN. The
-investigation behind this package showed, repeatedly and by measurement,
+investigation behind this work showed, repeatedly and by measurement,
 that in many plausible configurations they buy nothing — and that it is
 easy to build a benchmark in which no controller, however good, can show a
 difference. The headline scenario, `configs/scenarios/S16_high_ceiling.yaml`,
 is therefore built to satisfy stated conditions, each established by an
 arbiter-free measurement **before** any controller was scored on it. These
-conditions are the scope, and they should be reported with any result.
+conditions are the scope, and they are reported.
 
 1. **Hard slicing** (`ran.allocation: dedicated`). Each tenant's PRB
    reservation is dedicated to it; a reserved PRB it does not use is not
    lent to other slices, and an unreserved PRB is idle. Under the
    alternative — a work-conserving shared remainder — releasing every
    reservation into the shared pool is optimal whenever load peaks do not
-   coincide, and arbitration becomes pointless (measured: all-admit scored
+   coincide, and arbitration becomes pointless (measured outcome: all-admit scored
    0.941, above every controller).
 2. **A finite pool** (`arbiter.c2_cell_pool: true`). C2 requires both each
    tenant's committed reservations to fit its envelope and all
@@ -168,8 +168,7 @@ plant state *including* its random stream, so two clones stepped
 identically see identical traffic, fading and mobility — this is what makes
 paired, noise-cancelled comparisons possible. `reseed()` gives a clone, and
 every stochastic sub-model, a fresh stream, which is what makes replicates
-genuinely independent. (An early version reseeded only the top level;
-every "replicate" then silently replayed the same future.)
+genuinely independent.
 
 ---
 
@@ -210,7 +209,7 @@ and a **safety stage** — the robust floor in §6.9. Its table comes from the
 offline sweep, which scales every tenant's load together, exactly as the
 original.
 
-### INTACT-RA-Agentic
+### INTACT-RA-Agentic (or Simply "Agentic-INTACT" which we used in the paper)
 
 INTACT-RA's decision procedure with its sensitivity table, context and
 candidate generation replaced, as described in §6.
